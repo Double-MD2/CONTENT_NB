@@ -15,6 +15,17 @@ interface Chapter {
   verses: Verse[];
 }
 
+interface BibleBook {
+  name: string;
+  chapters: {
+    number: number;
+    verses: {
+      number: number;
+      text: string;
+    }[];
+  }[];
+}
+
 export default function ChapterPage() {
   const router = useRouter();
   const params = useParams();
@@ -30,11 +41,44 @@ export default function ChapterPage() {
         const bookName = decodeURIComponent(params.book as string);
         const chapterNum = parseInt(params.chapter as string);
         
-        // Gera versículos de exemplo
+        // Busca o arquivo bible-data.json da pasta public
+        const response = await fetch('/bible-data.json');
+        
+        if (!response.ok) {
+          throw new Error('Erro ao carregar dados da Bíblia');
+        }
+        
+        const bibleData: BibleBook[] = await response.json();
+        
+        // Busca o livro específico
+        const book = bibleData.find(b => b.name === bookName);
+        
+        if (!book) {
+          throw new Error('Livro não encontrado');
+        }
+        
+        // Busca o capítulo específico
+        const chapter = book.chapters.find(c => c.number === chapterNum);
+        
+        if (!chapter) {
+          throw new Error('Capítulo não encontrado');
+        }
+
+        setChapterData({
+          book: bookName,
+          chapter: chapterNum,
+          verses: chapter.verses
+        });
+      } catch (error) {
+        console.error('Erro ao carregar capítulo:', error);
+        
+        // Fallback com dados de exemplo em caso de erro
+        const bookName = decodeURIComponent(params.book as string);
+        const chapterNum = parseInt(params.chapter as string);
         const numVerses = Math.floor(Math.random() * 20) + 10;
         const verses = Array.from({ length: numVerses }, (_, i) => ({
           number: i + 1,
-          text: `Este é o versículo ${i + 1} do capítulo ${chapterNum}. Para ver o conteúdo real da Bíblia, adicione o arquivo bible-data.json completo na pasta public/.`
+          text: `Este é o versículo ${i + 1} do capítulo ${chapterNum}. Adicione o arquivo bible-data.json na pasta public/ para ver o conteúdo real.`
         }));
 
         setChapterData({
@@ -42,8 +86,6 @@ export default function ChapterPage() {
           chapter: chapterNum,
           verses
         });
-      } catch (error) {
-        console.error('Erro ao carregar capítulo:', error);
       } finally {
         setLoading(false);
       }
