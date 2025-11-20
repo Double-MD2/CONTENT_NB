@@ -7,11 +7,10 @@ import { UserProfile } from '@/lib/types';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTabUse: string;
 }
 
-export default function Sidebar({ isOpen, onClose, activeTabUse }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState(activeTabUse);
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
@@ -22,7 +21,6 @@ export default function Sidebar({ isOpen, onClose, activeTabUse }: SidebarProps)
       const parsed = JSON.parse(saved);
       setProfile(parsed);
       setEditedProfile(parsed);
-      setActiveTab(activeTabUse);
     }
   }, [isOpen]);
 
@@ -36,7 +34,7 @@ export default function Sidebar({ isOpen, onClose, activeTabUse }: SidebarProps)
     const days = 30;
     const data = [];
     const today = new Date();
-
+    
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
