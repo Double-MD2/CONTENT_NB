@@ -107,7 +107,7 @@ export default function HomePage() {
             >
               <Menu className="w-6 h-6 text-gray-700" />
             </button>
-            
+
             <div className="flex items-center gap-2">
               <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
@@ -129,7 +129,7 @@ export default function HomePage() {
               {contents.filter(c => c.completed).length} de {contents.length} completos
             </span>
           </div>
-          
+
           <div className="flex justify-between gap-2">
             {weekDays.map((day, index) => (
               <button
@@ -148,8 +148,8 @@ export default function HomePage() {
         </div>
 
         {/* Quick Access Buttons */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
-          <button 
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          <button
             onClick={() => router.push('/bible')}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
@@ -195,7 +195,7 @@ export default function HomePage() {
                 style={{ backgroundImage: `url(${content.image})` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                
+
                 <div className="absolute top-4 right-4 flex gap-2">
                   <button
                     onClick={(e) => {
@@ -210,7 +210,7 @@ export default function HomePage() {
                   >
                     <CheckCircle2 className="w-5 h-5" />
                   </button>
-                  <button 
+                  <button
                     onClick={(e) => e.stopPropagation()}
                     className="p-2 bg-white/90 hover:bg-white rounded-full transition-colors"
                   >
