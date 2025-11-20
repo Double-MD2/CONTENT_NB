@@ -13,7 +13,7 @@ const mockContents: DailyContent[] = [
     title: 'Leccionário do Dia',
     content: 'Leitura conforme o calendário litúrgico de hoje.',
     duration: '5 min',
-    image: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=800&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1639474894531-82a7fe3c5098?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     completed: false,
   },
   {
@@ -66,6 +66,7 @@ export default function HomePage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
+  const [activeItemSideBar, setActiveItemSideBar] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
   const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
@@ -95,6 +96,12 @@ export default function HomePage() {
     }
   };
 
+  function setOpenSideMenu() {
+    setActiveItemSideBar('contribute')
+    setSidebarOpen(true)
+   }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
       {/* Header */}
@@ -107,9 +114,9 @@ export default function HomePage() {
             >
               <Menu className="w-6 h-6 text-gray-700" />
             </button>
-            
+
             <div className="flex items-center gap-2">
-              <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
+              <h1 className="text-xl font-bold text-gray-800">Plano Diário</h1>
             </div>
 
             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
@@ -129,7 +136,7 @@ export default function HomePage() {
               {contents.filter(c => c.completed).length} de {contents.length} completos
             </span>
           </div>
-          
+
           <div className="flex justify-between gap-2">
             {weekDays.map((day, index) => (
               <button
@@ -148,8 +155,8 @@ export default function HomePage() {
         </div>
 
         {/* Quick Access Buttons */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
-          <button 
+        <div className="grid grid-cols-4 gap-3 mb-6 ">
+          <button
             onClick={() => router.push('/bible')}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
@@ -159,18 +166,11 @@ export default function HomePage() {
             <span className="text-xs font-semibold text-gray-700 text-center">Bíblia</span>
           </button>
 
-          <button className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
+          <button onClick={setOpenSideMenu} className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
             <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
             <span className="text-xs font-semibold text-gray-700 text-center">Contribuir</span>
-          </button>
-
-          <button className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-500 rounded-full flex items-center justify-center">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xs font-semibold text-gray-700 text-center">Convívio</span>
           </button>
 
           <button className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
@@ -202,7 +202,7 @@ export default function HomePage() {
                 style={{ backgroundImage: `url(${content.image})` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                
+
                 <div className="absolute top-4 right-4 flex gap-2">
                   <button
                     onClick={(e) => {
@@ -217,7 +217,7 @@ export default function HomePage() {
                   >
                     <CheckCircle2 className="w-5 h-5" />
                   </button>
-                  <button 
+                  <button
                     onClick={(e) => e.stopPropagation()}
                     className="p-2 bg-white/90 hover:bg-white rounded-full transition-colors"
                   >
@@ -271,10 +271,38 @@ export default function HomePage() {
         </div>
       </div>
 
-
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-around py-3">
+            <button className="flex flex-col items-center gap-1 text-amber-500">
+              <Home className="w-6 h-6" />
+              <span className="text-xs font-medium">Início</span>
+            </button>
+            <button
+              onClick={() => router.push('/bible')}
+              className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <BookOpen className="w-6 h-6" />
+              <span className="text-xs font-medium">Bíblia</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors">
+              <Heart className="w-6 h-6" />
+              <span className="text-xs font-medium">Favoritos</span>
+            </button>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <User className="w-6 h-6" />
+              <span className="text-xs font-medium">Perfil</span>
+            </button>
+          </div>
+        </div>
+      </nav>
 
       {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} activeTabUse={activeItemSideBar} onClose={() => setSidebarOpen(false)} />
     </div>
   );
 }
