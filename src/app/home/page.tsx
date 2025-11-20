@@ -109,7 +109,7 @@ export default function HomePage() {
             </button>
             
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-800">Plano Diário</h1>
+              <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
 
             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
@@ -271,35 +271,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-around py-3">
-            <button className="flex flex-col items-center gap-1 text-amber-500">
-              <Home className="w-6 h-6" />
-              <span className="text-xs font-medium">Início</span>
-            </button>
-            <button 
-              onClick={() => router.push('/bible')}
-              className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <BookOpen className="w-6 h-6" />
-              <span className="text-xs font-medium">Bíblia</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors">
-              <Heart className="w-6 h-6" />
-              <span className="text-xs font-medium">Favoritos</span>
-            </button>
-            <button 
-              onClick={() => setSidebarOpen(true)}
-              className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <User className="w-6 h-6" />
-              <span className="text-xs font-medium">Perfil</span>
-            </button>
-          </div>
-        </div>
-      </nav>
+
 
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
