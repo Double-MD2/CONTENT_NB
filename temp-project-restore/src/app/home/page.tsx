@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Menu, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Menu, Bell, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
 
@@ -9,7 +9,7 @@ const mockContents: DailyContent[] = [
   {
     id: '1',
     type: 'lectionary',
-    title: 'Leitura Diária',
+    title: 'Leccionário do Dia',
     content: 'Leitura conforme o calendário litúrgico de hoje.',
     duration: '5 min',
     image: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=800&h=400&fit=crop',
@@ -91,18 +91,11 @@ export default function HomePage() {
   const handleCardClick = (content: DailyContent) => {
     if (content.type === 'gratitude') {
       window.location.href = '/gratitude';
-    } else if (content.type === 'lectionary') {
-      // Abre a leitura do Leccionário Litúrgico em nova aba
-      window.open('https://www.cnbb.org.br/liturgia-diaria/', '_blank', 'noopener,noreferrer');
     }
   };
 
   const handleBibleClick = () => {
     window.location.href = '/bible';
-  };
-
-  const handleChatClick = () => {
-    window.location.href = '/coming-soon';
   };
 
   const openSidebarWithTab = (tab: 'account' | 'contribute' | 'frequency' | 'store') => {
@@ -127,7 +120,10 @@ export default function HomePage() {
               <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
 
-            <div className="w-10"></div>
+            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
+              <Bell className="w-6 h-6 text-gray-700" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full"></span>
+            </button>
           </div>
         </div>
       </header>
@@ -191,10 +187,7 @@ export default function HomePage() {
             <span className="text-xs font-semibold text-gray-700 text-center">Shop</span>
           </button>
 
-          <button 
-            onClick={handleChatClick}
-            className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
-          >
+          <button className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
             <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-pink-500 rounded-full flex items-center justify-center">
               <MessageCircle className="w-6 h-6 text-white" />
             </div>
@@ -284,6 +277,8 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+
 
       {/* Sidebar */}
       <Sidebar 
