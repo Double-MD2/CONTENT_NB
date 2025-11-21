@@ -7,20 +7,14 @@ import { UserProfile } from '@/lib/types';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTab?: 'account' | 'contribute' | 'frequency' | 'store';
+  initialTab?: 'account' | 'contribute' | 'frequency' | 'store';
 }
 
-export default function Sidebar({ isOpen, onClose, activeTab: externalActiveTab }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>(externalActiveTab || 'account');
+export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: SidebarProps) {
+  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>(initialTab);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
-
-  useEffect(() => {
-    if (externalActiveTab) {
-      setActiveTab(externalActiveTab);
-    }
-  }, [externalActiveTab]);
 
   useEffect(() => {
     const saved = localStorage.getItem('userProfile');
@@ -30,6 +24,12 @@ export default function Sidebar({ isOpen, onClose, activeTab: externalActiveTab 
       setEditedProfile(parsed);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   const handleSaveProfile = () => {
     localStorage.setItem('userProfile', JSON.stringify(editedProfile));
