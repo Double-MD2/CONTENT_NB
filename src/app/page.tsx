@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Page() {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
     // Verificar se o onboarding foi completado
     const onboardingCompleted = localStorage.getItem('onboardingCompleted');
     
@@ -15,7 +22,7 @@ export default function Page() {
     } else {
       router.push('/onboarding');
     }
-  }, [router]);
+  }, [router, isMounted]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">

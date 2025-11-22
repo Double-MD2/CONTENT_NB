@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Menu, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Menu, Bell, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
 
@@ -9,7 +9,7 @@ const mockContents: DailyContent[] = [
   {
     id: '1',
     type: 'lectionary',
-    title: 'Leitura Diária',
+    title: 'Leitura do Dia',
     content: 'Leitura conforme o calendário litúrgico de hoje.',
     duration: '5 min',
     image: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=800&h=400&fit=crop',
@@ -67,6 +67,7 @@ export default function HomePage() {
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
   const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [consecutiveDays, setConsecutiveDays] = useState(0);
 
   useEffect(() => {
     // Carregar dados do localStorage
@@ -74,7 +75,50 @@ export default function HomePage() {
     if (saved) {
       setContents(JSON.parse(saved));
     }
+
+    // Calcular dias consecutivos
+    const consecutive = calculateConsecutiveDays();
+    setConsecutiveDays(consecutive);
   }, []);
+
+  const calculateConsecutiveDays = (): number => {
+    const history = getAccessHistory();
+    let consecutive = 0;
+    
+    // Contar de trás para frente (do mais recente para o mais antigo)
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].accessed) {
+        consecutive++;
+      } else {
+        break;
+      }
+    }
+    
+    return consecutive;
+  };
+
+  const getAccessHistory = () => {
+    const saved = localStorage.getItem('accessHistory');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    
+    // Criar histórico inicial dos últimos 30 dias
+    const history: any[] = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      history.push({
+        date: date.toISOString(),
+        accessed: i === 0, // Apenas hoje está acessado inicialmente
+      });
+    }
+    
+    localStorage.setItem('accessHistory', JSON.stringify(history));
+    return history;
+  };
 
   const toggleComplete = (id: string) => {
     const updated = contents.map(content =>
@@ -92,17 +136,16 @@ export default function HomePage() {
     if (content.type === 'gratitude') {
       window.location.href = '/gratitude';
     } else if (content.type === 'lectionary') {
-      // Abre a leitura do Leccionário Litúrgico em nova aba
-      window.open('https://www.cnbb.org.br/liturgia-diaria/', '_blank', 'noopener,noreferrer');
+      window.location.href = '/leitura-do-dia';
+    } else if (content.type === 'verse') {
+      window.location.href = '/versiculo-do-dia';
+    } else if (content.type === 'prayer') {
+      window.location.href = '/oracao-do-dia';
     }
   };
 
   const handleBibleClick = () => {
     window.location.href = '/bible';
-  };
-
-  const handleChatClick = () => {
-    window.location.href = '/coming-soon';
   };
 
   const openSidebarWithTab = (tab: 'account' | 'contribute' | 'frequency' | 'store') => {
@@ -127,7 +170,16 @@ export default function HomePage() {
               <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
 
-            <div className="w-10"></div>
+            {/* Card de Sequência Atual - substituindo o sininho */}
+            <button 
+              onClick={() => openSidebarWithTab('frequency')}
+              className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl p-3 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
+            >
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 animate-pulse" />
+                <p className="text-lg font-bold leading-none">{consecutiveDays}</p>
+              </div>
+            </button>
           </div>
         </div>
       </header>
@@ -165,7 +217,7 @@ export default function HomePage() {
             onClick={handleBibleClick}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <span className="text-xs font-semibold text-gray-700 text-center">Bíblia</span>
@@ -185,16 +237,13 @@ export default function HomePage() {
             onClick={() => openSidebarWithTab('store')}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center">
               <ShoppingCart className="w-6 h-6 text-white" />
             </div>
             <span className="text-xs font-semibold text-gray-700 text-center">Shop</span>
           </button>
 
-          <button 
-            onClick={handleChatClick}
-            className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
-          >
+          <button className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all">
             <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-pink-500 rounded-full flex items-center justify-center">
               <MessageCircle className="w-6 h-6 text-white" />
             </div>
@@ -284,6 +333,8 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+
 
       {/* Sidebar */}
       <Sidebar 
