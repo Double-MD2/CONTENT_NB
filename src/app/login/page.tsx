@@ -1,131 +1,43 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  
-  // Ref para evitar múltiplos redirecionamentos
-  const isRedirectingRef = useRef(false);
+  const [loading, setLoading] = useState(true);
 
-  // Verificar se usuário já está autenticado
   useEffect(() => {
-    let isMounted = true;
-
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!isMounted) return;
-
-        if (session && !isRedirectingRef.current) {
-          isRedirectingRef.current = true;
-          router.replace('/');
-        } else {
-          setIsCheckingAuth(false);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar autenticação:', error);
-        if (isMounted) {
-          setIsCheckingAuth(false);
-        }
+    // Verificar se usuário já está logado
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.push('/home');
+      } else {
+        setLoading(false);
       }
-    };
+    });
 
-    checkAuth();
+    // Escutar mudanças de autenticação
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.push('/home');
+      }
+    });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => subscription.unsubscribe();
   }, [router]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isRedirectingRef.current) return;
-    
-    setLoading(true);
-    setError('');
-
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        setError(signInError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data.session && !isRedirectingRef.current) {
-        isRedirectingRef.current = true;
-        
-        // Pequeno delay para garantir que a sessão seja salva
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        router.replace('/');
-      }
-    } catch (err) {
-      console.error('Erro no login:', err);
-      setError('Erro ao fazer login. Tente novamente.');
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isRedirectingRef.current) return;
-    
-    setLoading(true);
-    setError('');
-
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (signUpError) {
-        setError(signUpError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data.session && !isRedirectingRef.current) {
-        isRedirectingRef.current = true;
-        
-        // Pequeno delay para garantir que a sessão seja salva
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        router.replace('/');
-      } else if (data.user && !data.session) {
-        setError('Verifique seu email para confirmar o cadastro.');
-        setLoading(false);
-      }
-    } catch (err) {
-      console.error('Erro no cadastro:', err);
-      setError('Erro ao criar conta. Tente novamente.');
-      setLoading(false);
-    }
-  };
-
-  // Mostrar loading enquanto verifica autenticação
-  if (isCheckingAuth) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Verificando autenticação...</p>
+          <p className="text-gray-600">Carregando...</p>
         </div>
       </div>
     );
@@ -134,80 +46,68 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Bem-vindo! 👋
-            </h1>
-            <p className="text-gray-600">
-              Entre com sua conta ou crie uma nova
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none transition-all"
-                placeholder="seu@email.com"
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none transition-all"
-                placeholder="••••••••"
-                required
-                disabled={loading}
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-amber-500 text-white py-3 rounded-lg font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Entrando...' : 'Entrar'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSignUp}
-                disabled={loading}
-                className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Criando conta...' : 'Criar nova conta'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Ao continuar, você concorda com nossos</p>
-            <p>Termos de Serviço e Política de Privacidade</p>
-          </div>
+        <div className="text-center mb-8">
+          <img 
+            src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" 
+            alt="Plano Diário" 
+            className="h-24 w-auto mx-auto mb-4" 
+          />
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Bem-vindo!</h1>
+          <p className="text-gray-600">Entre para continuar sua jornada espiritual</p>
         </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          <Auth
+            supabaseClient={supabase}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: '#f59e0b',
+                    brandAccent: '#d97706',
+                  },
+                },
+              },
+              className: {
+                container: 'auth-container',
+                button: 'auth-button',
+                input: 'auth-input',
+              },
+            }}
+            localization={{
+              variables: {
+                sign_in: {
+                  email_label: 'Email',
+                  password_label: 'Senha',
+                  button_label: 'Entrar',
+                  loading_button_label: 'Entrando...',
+                  social_provider_text: 'Entrar com {{provider}}',
+                  link_text: 'Já tem uma conta? Entre',
+                },
+                sign_up: {
+                  email_label: 'Email',
+                  password_label: 'Senha',
+                  button_label: 'Criar conta',
+                  loading_button_label: 'Criando conta...',
+                  social_provider_text: 'Cadastrar com {{provider}}',
+                  link_text: 'Não tem uma conta? Cadastre-se',
+                },
+                forgotten_password: {
+                  email_label: 'Email',
+                  button_label: 'Enviar instruções',
+                  loading_button_label: 'Enviando...',
+                  link_text: 'Esqueceu sua senha?',
+                },
+              },
+            }}
+            providers={[]}
+          />
+        </div>
+
+        <p className="text-center text-sm text-gray-500 mt-6">
+          Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade
+        </p>
       </div>
     </div>
   );
