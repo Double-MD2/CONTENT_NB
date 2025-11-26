@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useRouter } from 'next/navigation';
@@ -9,23 +9,56 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verificar se usuário já está logado
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.push('/home');
-      } else {
+    // Verificar se Supabase está configurado
+    if (!isSupabaseConfigured()) {
+      setError('Supabase não está configurado. Configure as variáveis de ambiente.');
+      setLoading(false);
+      return;
+    }
+
+    // Verificar sessão atual
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.warn('Erro ao buscar sessão:', sessionError);
+          setLoading(false);
+          return;
+        }
+
+        if (session) {
+          // Usuário já está logado, redirecionar
+          router.push('/');
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar sessão:', err);
         setLoading(false);
       }
-    });
+    };
+
+    checkSession();
 
     // Escutar mudanças de autenticação
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        router.push('/home');
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Redirecionar para página inicial após login bem-sucedido
+        router.push('/');
+      }
+      
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('Token atualizado com sucesso');
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setLoading(false);
       }
     });
 
@@ -38,6 +71,23 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+          <div className="text-center">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Erro de Configuração</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <p className="text-sm text-gray-500">
+              Clique no banner laranja acima para configurar suas variáveis de ambiente do Supabase.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -102,6 +152,7 @@ export default function LoginPage() {
               },
             }}
             providers={[]}
+            redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : '/'}
           />
         </div>
 
