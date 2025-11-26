@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Menu, Bell, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
 const mockContents: DailyContent[] = [
@@ -74,24 +74,48 @@ export default function HomePage() {
   const [consecutiveDays, setConsecutiveDays] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    initializeUser();
+    checkSessionAndInitialize();
   }, []);
 
-  const initializeUser = async () => {
+  const checkSessionAndInitialize = async () => {
     try {
-      // Verificar se usuário está logado
-      const { data: { session } } = await supabase.auth.getSession();
+      const supabase = createClient();
       
-      if (!session) {
-        router.push('/login');
+      // PRIMEIRO: Verificar se existe sessão
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Erro ao verificar sessão:', sessionError);
+        router.replace('/login');
         return;
       }
 
+      if (!session) {
+        // Sem sessão, redirecionar para login
+        router.replace('/login');
+        return;
+      }
+
+      // Sessão confirmada, marcar como verificada
+      setSessionChecked(true);
       const currentUserId = session.user.id;
       setUserId(currentUserId);
 
+      // AGORA SIM: Fazer chamadas ao banco de dados
+      await initializeUserData(currentUserId);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao verificar sessão:', error);
+      router.replace('/login');
+    }
+  };
+
+  const initializeUserData = async (currentUserId: string) => {
+    try {
       // Buscar dados do usuário do banco de dados
       const response = await fetch(`/api/user?userId=${currentUserId}`);
       const data = await response.json();
@@ -134,11 +158,8 @@ export default function HomePage() {
         setContents(updatedContents);
         localStorage.setItem('dailyContents', JSON.stringify(updatedContents));
       }
-
-      setLoading(false);
     } catch (error) {
-      console.error('Erro ao inicializar usuário:', error);
-      setLoading(false);
+      console.error('Erro ao inicializar dados do usuário:', error);
     }
   };
 
@@ -283,7 +304,7 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
-  if (loading) {
+  if (loading || !sessionChecked) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
         <div className="text-center">

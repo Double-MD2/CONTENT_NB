@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, User, Camera, Heart, DollarSign, Calendar, Edit2, ShoppingCart, LogOut, Award, TrendingUp, Star } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ interface AccessRecord {
 }
 
 export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: SidebarProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>(initialTab);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);

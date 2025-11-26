@@ -1,44 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
-// Ler variáveis de ambiente
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Validação robusta das variáveis de ambiente
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Erro: Variáveis de ambiente do Supabase não configuradas!');
-  console.error('Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no arquivo .env.local');
+// Função helper para criar cliente Supabase no browser
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 }
-
-// Criar cliente Supabase com validação
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: 'pkce',
-      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    },
-    global: {
-      headers: {
-        'x-application-name': 'plano-diario',
-      },
-    },
-  }
-);
 
 // Função helper para verificar se o Supabase está configurado corretamente
 export const isSupabaseConfigured = (): boolean => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  
   const isConfigured = Boolean(
     supabaseUrl && 
     supabaseAnonKey && 
     supabaseUrl !== '' && 
     supabaseAnonKey !== '' &&
-    supabaseUrl !== 'https://placeholder.supabase.co' &&
-    supabaseAnonKey !== 'placeholder-key'
+    !supabaseUrl.includes('placeholder') &&
+    !supabaseAnonKey.includes('placeholder')
   );
   
   if (!isConfigured) {

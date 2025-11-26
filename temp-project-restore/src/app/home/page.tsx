@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Menu, Bell, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 const mockContents: DailyContent[] = [
   {
@@ -46,7 +48,7 @@ const mockContents: DailyContent[] = [
     title: 'Oração do Dia',
     content: 'Senhor, guia meus passos hoje. Que eu possa ser luz para aqueles ao meu redor...',
     duration: '2 min',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1445445290350-18a3b86e0b5a?w=800&h=400&fit=crop&q=80',
     completed: false,
   },
   {
@@ -63,81 +65,187 @@ const mockContents: DailyContent[] = [
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 export default function HomePage() {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
   const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [consecutiveDays, setConsecutiveDays] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Carregar dados do localStorage
-    const saved = localStorage.getItem('dailyContents');
-    if (saved) {
-      const savedContents = JSON.parse(saved);
-      // Atualizar os dados dos cards para garantir que estão corretos
-      const updatedContents = savedContents.map((content: DailyContent) => {
-        if (content.id === '2' && content.type === 'verse') {
-          return {
-            ...content,
-            reflection: 'Versículos sobre o amor incondicional de Deus e com reflexões para internalizar no coração'
-          };
-        }
-        // Atualizar a imagem do card "Oração do Dia"
-        if (content.id === '4' && content.type === 'prayer') {
-          return {
-            ...content,
-            image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=400&fit=crop&q=80'
-          };
-        }
-        return content;
-      });
-      setContents(updatedContents);
-      localStorage.setItem('dailyContents', JSON.stringify(updatedContents));
-    }
-
-    // Calcular dias consecutivos
-    const consecutive = calculateConsecutiveDays();
-    setConsecutiveDays(consecutive);
+    initializeUser();
   }, []);
 
-  const calculateConsecutiveDays = (): number => {
-    const history = getAccessHistory();
+  const initializeUser = async () => {
+    try {
+      // Verificar se usuário está logado
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      const currentUserId = session.user.id;
+      setUserId(currentUserId);
+
+      // Buscar dados do usuário do banco de dados
+      const response = await fetch(`/api/user?userId=${currentUserId}`);
+      const data = await response.json();
+
+      if (data.userData) {
+        setConsecutiveDays(data.userData.consecutive_days || 0);
+        
+        // Se tem histórico, calcular dias consecutivos
+        if (data.accessHistory && data.accessHistory.length > 0) {
+          const consecutive = calculateConsecutiveDaysFromHistory(data.accessHistory);
+          setConsecutiveDays(consecutive);
+        }
+      } else {
+        // Primeiro acesso - criar dados iniciais
+        await createInitialUserData(currentUserId);
+      }
+
+      // Registrar acesso de hoje
+      await registerTodayAccess(currentUserId);
+
+      // Carregar conteúdos do localStorage (temporário até migrar para DB)
+      const saved = localStorage.getItem('dailyContents');
+      if (saved) {
+        const savedContents = JSON.parse(saved);
+        const updatedContents = savedContents.map((content: DailyContent) => {
+          if (content.id === '2' && content.type === 'verse') {
+            return {
+              ...content,
+              reflection: 'Versículos sobre o amor incondicional de Deus e com reflexões para internalizar no coração'
+            };
+          }
+          if (content.id === '4' && content.type === 'prayer') {
+            return {
+              ...content,
+              image: 'https://images.unsplash.com/photo-1445445290350-18a3b86e0b5a?w=800&h=400&fit=crop&q=80'
+            };
+          }
+          return content;
+        });
+        setContents(updatedContents);
+        localStorage.setItem('dailyContents', JSON.stringify(updatedContents));
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao inicializar usuário:', error);
+      setLoading(false);
+    }
+  };
+
+  const createInitialUserData = async (currentUserId: string) => {
+    try {
+      // Criar dados iniciais do usuário
+      await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          consecutiveDays: 1,
+          lastAccessDate: new Date().toISOString(),
+          onboardingCompleted: false
+        })
+      });
+
+      // Criar histórico inicial dos últimos 30 dias
+      const today = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        
+        await fetch('/api/access-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUserId,
+            accessDate: date.toISOString().split('T')[0],
+            accessed: i === 0 // Apenas hoje está acessado
+          })
+        });
+      }
+
+      setConsecutiveDays(1);
+    } catch (error) {
+      console.error('Erro ao criar dados iniciais:', error);
+    }
+  };
+
+  const registerTodayAccess = async (currentUserId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      await fetch('/api/access-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          accessDate: today,
+          accessed: true
+        })
+      });
+
+      // Buscar histórico atualizado e recalcular dias consecutivos
+      const response = await fetch(`/api/access-history?userId=${currentUserId}`);
+      const history = await response.json();
+      
+      if (history && history.length > 0) {
+        const consecutive = calculateConsecutiveDaysFromHistory(history);
+        setConsecutiveDays(consecutive);
+
+        // Atualizar dados do usuário
+        await fetch('/api/user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUserId,
+            consecutiveDays: consecutive,
+            lastAccessDate: new Date().toISOString(),
+            onboardingCompleted: true
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao registrar acesso:', error);
+    }
+  };
+
+  const calculateConsecutiveDaysFromHistory = (history: any[]): number => {
+    if (!history || history.length === 0) return 0;
+
+    // Ordenar por data decrescente (mais recente primeiro)
+    const sortedHistory = [...history].sort((a, b) => 
+      new Date(b.access_date).getTime() - new Date(a.access_date).getTime()
+    );
+
     let consecutive = 0;
-    
-    // Contar de trás para frente (do mais recente para o mais antigo)
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i].accessed) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < sortedHistory.length; i++) {
+      const accessDate = new Date(sortedHistory[i].access_date);
+      accessDate.setHours(0, 0, 0, 0);
+      
+      const expectedDate = new Date(today);
+      expectedDate.setDate(today.getDate() - i);
+      expectedDate.setHours(0, 0, 0, 0);
+
+      if (accessDate.getTime() === expectedDate.getTime() && sortedHistory[i].accessed) {
         consecutive++;
       } else {
         break;
       }
     }
-    
-    return consecutive;
-  };
 
-  const getAccessHistory = () => {
-    const saved = localStorage.getItem('accessHistory');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    
-    // Criar histórico inicial dos últimos 30 dias
-    const history: any[] = [];
-    const today = new Date();
-    
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      history.push({
-        date: date.toISOString(),
-        accessed: i === 0, // Apenas hoje está acessado inicialmente
-      });
-    }
-    
-    localStorage.setItem('accessHistory', JSON.stringify(history));
-    return history;
+    return consecutive;
   };
 
   const toggleComplete = (id: string) => {
@@ -175,6 +283,17 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
       {/* Header */}
@@ -192,7 +311,7 @@ export default function HomePage() {
               <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
 
-            {/* Card de Sequência Atual - substituindo o sininho */}
+            {/* Card de Sequência Atual */}
             <button 
               onClick={() => openSidebarWithTab('frequency')}
               className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl p-3 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
@@ -355,8 +474,6 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-
-
 
       {/* Sidebar */}
       <Sidebar 

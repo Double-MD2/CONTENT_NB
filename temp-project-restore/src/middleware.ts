@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   // Se não está logado e está tentando acessar rota protegida
-  if (!session && !req.nextUrl.pathname.startsWith('/login')) {
+  if (!session && !req.nextUrl.pathname.startsWith('/login') && req.nextUrl.pathname !== '/') {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
