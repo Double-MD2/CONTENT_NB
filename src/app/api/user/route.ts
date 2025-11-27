@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Criar client do servidor com service role para API routes
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    }
+  }
+);
 
 // GET - Buscar dados do usuário
 export async function GET(request: NextRequest) {
@@ -12,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Buscar dados do usuário
-    const { data: userData, error: userDataError } = await supabase
+    const { data: userData, error: userDataError } = await supabaseAdmin
       .from('user_data')
       .select('*')
       .eq('user_id', userId)
@@ -23,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Buscar histórico de acesso
-    const { data: accessHistory, error: historyError } = await supabase
+    const { data: accessHistory, error: historyError } = await supabaseAdmin
       .from('access_history')
       .select('*')
       .eq('user_id', userId)
@@ -54,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar se já existe dados do usuário
-    const { data: existingData } = await supabase
+    const { data: existingData } = await supabaseAdmin
       .from('user_data')
       .select('*')
       .eq('user_id', userId)
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
     let result;
     if (existingData) {
       // Atualizar dados existentes
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('user_data')
         .update({
           consecutive_days: consecutiveDays,
@@ -79,7 +91,7 @@ export async function POST(request: NextRequest) {
       result = data;
     } else {
       // Criar novos dados
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('user_data')
         .insert({
           user_id: userId,

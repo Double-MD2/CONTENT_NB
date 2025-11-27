@@ -1,186 +1,175 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase';
+import { useState, useEffect } from 'react';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'sign_in' | 'sign_up' | 'forgot_password'>('sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  
-  // ✅ useRef para garantir que o listener seja registrado apenas uma vez
-  const listenerRegistered = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // ✅ CORREÇÃO 1: Array vazio [] - useEffect roda APENAS UMA VEZ no mount
-    // Não recebe objetos, arrays ou funções nas dependências
-    
+    console.log('[LOGIN useEffect] Iniciando verificação...');
+
     // Verificar se Supabase está configurado
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!isSupabaseConfigured()) {
+      console.log('[LOGIN useEffect] Supabase não configurado');
       setError('Supabase não está configurado. Configure as variáveis de ambiente.');
       setLoading(false);
       return;
     }
 
-    const supabase = createClient();
+    // DESABILITADO temporariamente para evitar loops
+    // O middleware vai cuidar do redirecionamento se já tiver sessão
+    console.log('[LOGIN useEffect] Mostrando formulário (verificação de sessão desabilitada)');
+    setLoading(false);
 
-    // ✅ CORREÇÃO 2: Verificar sessão atual apenas uma vez
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          // Usuário já está logado, redirecionar
-          window.location.href = '/home';
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Erro ao verificar sessão:', err);
-        setLoading(false);
-      }
-    };
+    // Verificar sessão atual
+    // const checkSession = async () => {
+    //   try {
+    //     console.log('[LOGIN useEffect] Verificando sessão...');
+    //     const { data: { session } } = await supabase.auth.getSession();
+    //     console.log('[LOGIN useEffect] Sessão:', session ? 'encontrada' : 'não encontrada');
 
-    checkSession();
+    //     if (session) {
+    //       console.log('[LOGIN useEffect] Sessão encontrada, redirecionando para /home');
+    //       window.location.href = '/home';
+    //     } else {
+    //       console.log('[LOGIN useEffect] Nenhuma sessão, mostrando formulário');
+    //       setLoading(false);
+    //     }
+    //   } catch (err) {
+    //     console.error('[LOGIN useEffect] Erro ao verificar sessão:', err);
+    //     setLoading(false);
+    //   }
+    // };
 
-    // ✅ CORREÇÃO 3: Listener registrado apenas uma vez usando useRef
-    if (!listenerRegistered.current) {
-      listenerRegistered.current = true;
-      
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          console.log('🔐 Auth state changed:', event, session?.user?.email);
-
-          if (event === 'SIGNED_IN' && session) {
-            console.log('✅ Usuário logado com sucesso, redirecionando...');
-            // ✅ CORREÇÃO 4: window.location.href força refresh completo
-            // Garante que middleware reconheça a sessão
-            window.location.href = '/home';
-          } else if (event === 'SIGNED_OUT') {
-            console.log('👋 Usuário deslogado');
-            setLoading(false);
-          }
-        }
-      );
-
-      // ✅ CORREÇÃO 5: Cleanup sempre retorna unsubscribe
-      return () => {
-        subscription.unsubscribe();
-        listenerRegistered.current = false;
-      };
-    }
-  }, []); // ✅ Array vazio - NUNCA muda de tamanho, NUNCA recebe objetos/arrays
+    // checkSession();
+  }, [router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validação antes de enviar
-    if (!email || !email.trim()) {
-      setError('Por favor, preencha o email.');
-      return;
-    }
-    
-    if (!password || !password.trim()) {
-      setError('Por favor, preencha a senha.');
-      return;
-    }
-
-    setIsSubmitting(true);
+    setSubmitting(true);
     setError(null);
 
+    console.log('=== [LOGIN] INICIANDO PROCESSO DE LOGIN ===');
+    console.log('[LOGIN] Email:', email);
+    console.log('[LOGIN] localStorage antes:', localStorage.getItem('supabase.auth.token'));
+
     try {
-      console.log('🔐 Iniciando login...');
-      
-      const supabase = createClient();
-      
-      // ✅ CORREÇÃO 6: signInWithPassword salva sessão automaticamente
+      console.log('[LOGIN] Chamando signInWithPassword...');
+      const startTime = Date.now();
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
+        email,
+        password,
       });
 
+      const endTime = Date.now();
+      console.log(`[LOGIN] Resposta recebida em ${endTime - startTime}ms`);
+      console.log('[LOGIN] Data completo:', JSON.stringify(data, null, 2));
+      console.log('[LOGIN] Error:', signInError);
+
       if (signInError) {
-        console.error('❌ Erro ao fazer login:', signInError.message);
-        setError(signInError.message || 'Credenciais inválidas. Verifique email e senha.');
-        setIsSubmitting(false);
+        console.error('[LOGIN] ❌ Erro de autenticação:', signInError);
+        setError(signInError.message);
+        setSubmitting(false);
         return;
       }
 
       if (data.session) {
-        console.log('✅ Login bem-sucedido! Sessão criada.');
-        // ✅ O listener onAuthStateChange detecta SIGNED_IN e redireciona
-        // Não fazemos nada aqui para evitar redirecionamento duplo
+        console.log('[LOGIN] ✅ Sessão criada com sucesso!');
+        console.log('[LOGIN] User ID:', data.session.user.id);
+
+        // Aguardar 1 segundo para garantir que cookies e localStorage estejam sincronizados
+        console.log('[LOGIN] Aguardando 1s para sincronização de cookies...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Verificar se a sessão foi salva
+        const { data: { session: savedSession } } = await supabase.auth.getSession();
+
+        if (savedSession) {
+          console.log('[LOGIN] ✅ Sessão confirmada!');
+          console.log('[LOGIN] 🚀 Redirecionando para /home...');
+
+          // Usar window.location para garantir reload completo e middleware pegar os cookies
+          window.location.href = '/home';
+        } else {
+          console.error('[LOGIN] ❌ Sessão NÃO foi persistida!');
+          setError('Erro ao salvar sessão. Tente novamente.');
+          setSubmitting(false);
+        }
+      } else {
+        console.warn('[LOGIN] ⚠️ Login sem sessão');
+        setError('Erro: Sessão não foi criada');
+        setSubmitting(false);
       }
-      
-    } catch (err: any) {
-      console.error('❌ Erro inesperado:', err);
-      setError(`Erro inesperado: ${err?.message || 'Tente novamente.'}`);
-      setIsSubmitting(false);
+    } catch (err) {
+      console.error('[LOGIN] ❌ Exceção durante login:', err);
+      setError('Erro ao fazer login. Tente novamente.');
+      setSubmitting(false);
     }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validação antes de enviar
-    if (!email || !email.trim()) {
-      setError('Por favor, preencha o email.');
-      return;
-    }
-    
-    if (!password || !password.trim()) {
-      setError('Por favor, preencha a senha.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-
-    setIsSubmitting(true);
+    setSubmitting(true);
     setError(null);
 
     try {
-      const supabase = createClient();
-      
-      console.log('📝 Tentando cadastro...');
-      
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+        email,
+        password,
       });
 
       if (signUpError) {
-        console.error('❌ Erro ao criar conta:', signUpError.message);
-        setError(signUpError.message || 'Erro ao criar conta. Tente novamente.');
-        setIsSubmitting(false);
+        setError(signUpError.message);
+        setSubmitting(false);
         return;
       }
 
-      console.log('✅ Cadastro bem-sucedido!');
-
       if (data.session) {
-        // Cadastro com sessão imediata (confirmação de email desabilitada)
-        // O listener onAuthStateChange vai lidar com o redirecionamento
+        // Cadastro e login automático
+        router.replace('/home');
       } else {
-        // Cadastro requer confirmação de email
-        setError('Cadastro realizado! Verifique seu email para confirmar.');
-        setIsSubmitting(false);
+        // Email de confirmação enviado
+        setError('Verifique seu email para confirmar o cadastro.');
+        setSubmitting(false);
       }
-    } catch (err: any) {
-      console.error('❌ Erro inesperado ao criar conta:', err);
-      setError(`Erro inesperado: ${err?.message || 'Tente novamente.'}`);
-      setIsSubmitting(false);
+    } catch (err) {
+      console.error('Erro no cadastro:', err);
+      setError('Erro ao criar conta. Tente novamente.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+        setSubmitting(false);
+        return;
+      }
+
+      setError('Email de recuperação enviado! Verifique sua caixa de entrada.');
+      setSubmitting(false);
+    } catch (err) {
+      console.error('Erro ao recuperar senha:', err);
+      setError('Erro ao enviar email. Tente novamente.');
+      setSubmitting(false);
     }
   };
 
@@ -195,70 +184,34 @@ export default function LoginPage() {
     );
   }
 
-  if (error && error.includes('não está configurado')) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-          <div className="text-center">
-            <div className="text-red-500 text-5xl mb-4">⚠️</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Erro de Configuração</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <p className="text-sm text-gray-500">
-              Clique no banner laranja acima para configurar suas variáveis de ambiente do Supabase.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img 
-            src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" 
-            alt="Plano Diário" 
-            className="h-24 w-auto mx-auto mb-4" 
+          <img
+            src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png"
+            alt="Plano Diário"
+            className="h-24 w-auto mx-auto mb-4"
           />
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Bem-vindo!</h1>
           <p className="text-gray-600">Entre para continuar sua jornada espiritual</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => {
-                setMode('signin');
-                setError(null);
-              }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                mode === 'signin'
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Entrar
-            </button>
-            <button
-              onClick={() => {
-                setMode('signup');
-                setError(null);
-              }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                mode === 'signup'
-                  ? 'bg-amber-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Cadastrar
-            </button>
-          </div>
+          {error && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              error.includes('enviado') || error.includes('Verifique')
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {error}
+            </div>
+          )}
 
-          <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          {view === 'sign_in' && (
+            <form onSubmit={handleSignIn}>
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email
                 </label>
                 <input
@@ -267,14 +220,74 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   placeholder="seu@email.com"
                 />
               </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Senha
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Entrando...' : 'Entrar'}
+              </button>
+
+              <div className="mt-4 text-center space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setView('forgot_password')}
+                  className="text-sm text-amber-600 hover:text-amber-700"
+                >
+                  Esqueceu sua senha?
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setView('sign_up')}
+                    className="text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Não tem uma conta? <span className="text-amber-600 font-medium">Cadastre-se</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {view === 'sign_up' && (
+            <form onSubmit={handleSignUp}>
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="seu@email.com"
+                />
+              </div>
+
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                   Senha
                 </label>
                 <input
@@ -284,31 +297,67 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="••••••••"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Mínimo 6 caracteres"
                 />
               </div>
 
-              {error && !error.includes('não está configurado') && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{error}</p>
-                </div>
-              )}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Criando conta...' : 'Criar conta'}
+              </button>
+
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setView('sign_in')}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Já tem uma conta? <span className="text-amber-600 font-medium">Entre</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {view === 'forgot_password' && (
+            <form onSubmit={handleForgotPassword}>
+              <div className="mb-6">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="seu@email.com"
+                />
+              </div>
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting
-                  ? 'Processando...'
-                  : mode === 'signin'
-                  ? 'Entrar'
-                  : 'Criar conta'}
+                {submitting ? 'Enviando...' : 'Enviar instruções'}
               </button>
-            </div>
-          </form>
+
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setView('sign_in')}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Voltar para login
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">

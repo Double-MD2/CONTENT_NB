@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
@@ -9,29 +9,39 @@ export default function Home() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkUser = async () => {
       try {
-        const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
+        if (!isMounted) return;
+
         if (session) {
-          // Usuário está logado, redirecionar para home
           router.replace('/home');
         } else {
-          // Usuário não está logado, redirecionar para login
           router.replace('/login');
         }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error);
-        router.replace('/login');
+        if (isMounted) {
+          router.replace('/login');
+        }
       } finally {
-        setIsChecking(false);
+        if (isMounted) {
+          setIsChecking(false);
+        }
       }
     };
 
     checkUser();
-  }, []);
 
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  // Mostrar spinner ENQUANTO está checando
   if (isChecking) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">

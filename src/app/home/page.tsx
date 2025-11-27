@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Menu, Bell, Share2, CheckCircle2, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 const mockContents: DailyContent[] = [
@@ -74,67 +74,52 @@ export default function HomePage() {
   const [consecutiveDays, setConsecutiveDays] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    checkSessionAndInitialize();
+    initializeUser();
   }, []);
 
-  const checkSessionAndInitialize = async () => {
+  const initializeUser = async () => {
     try {
-      const supabase = createClient();
-      
-      // PRIMEIRO: Verificar se existe sessão
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Erro ao verificar sessão:', sessionError);
-        router.replace('/login');
-        return;
-      }
+      // Verificar se usuário está logado
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        // Sem sessão, redirecionar para login
-        router.replace('/login');
+        console.log('Nenhuma sessão encontrada');
+        router.push('/login');
         return;
       }
 
-      // Sessão confirmada, marcar como verificada
-      setSessionChecked(true);
       const currentUserId = session.user.id;
       setUserId(currentUserId);
 
-      // AGORA SIM: Fazer chamadas ao banco de dados
-      await initializeUserData(currentUserId);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Erro ao verificar sessão:', error);
-      router.replace('/login');
-    }
-  };
+      // Buscar dados do usuário do banco de dados (OPCIONAL - não bloqueia se falhar)
+      try {
+        const response = await fetch(`/api/user?userId=${currentUserId}`);
+        if (response.ok) {
+          const data = await response.json();
 
-  const initializeUserData = async (currentUserId: string) => {
-    try {
-      // Buscar dados do usuário do banco de dados
-      const response = await fetch(`/api/user?userId=${currentUserId}`);
-      const data = await response.json();
+          if (data.userData) {
+            setConsecutiveDays(data.userData.consecutive_days || 0);
 
-      if (data.userData) {
-        setConsecutiveDays(data.userData.consecutive_days || 0);
-        
-        // Se tem histórico, calcular dias consecutivos
-        if (data.accessHistory && data.accessHistory.length > 0) {
-          const consecutive = calculateConsecutiveDaysFromHistory(data.accessHistory);
-          setConsecutiveDays(consecutive);
+            // Se tem histórico, calcular dias consecutivos
+            if (data.accessHistory && data.accessHistory.length > 0) {
+              const consecutive = calculateConsecutiveDaysFromHistory(data.accessHistory);
+              setConsecutiveDays(consecutive);
+            }
+          } else {
+            // Primeiro acesso - criar dados iniciais
+            await createInitialUserData(currentUserId);
+          }
+
+          // Registrar acesso de hoje
+          await registerTodayAccess(currentUserId);
+        } else {
+          console.warn('⚠️  API de usuário não disponível (tabelas podem não existir ainda)');
         }
-      } else {
-        // Primeiro acesso - criar dados iniciais
-        await createInitialUserData(currentUserId);
+      } catch (apiError) {
+        console.warn('⚠️  Erro ao buscar dados do usuário (continuando sem dados):', apiError);
       }
-
-      // Registrar acesso de hoje
-      await registerTodayAccess(currentUserId);
 
       // Carregar conteúdos do localStorage (temporário até migrar para DB)
       const saved = localStorage.getItem('dailyContents');
@@ -158,8 +143,11 @@ export default function HomePage() {
         setContents(updatedContents);
         localStorage.setItem('dailyContents', JSON.stringify(updatedContents));
       }
+
+      setLoading(false);
     } catch (error) {
-      console.error('Erro ao inicializar dados do usuário:', error);
+      console.error('Erro ao inicializar usuário:', error);
+      setLoading(false);
     }
   };
 
@@ -304,7 +292,7 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
-  if (loading || !sessionChecked) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
         <div className="text-center">
