@@ -9,15 +9,44 @@ interface ActivityDay {
   activity_date: string;
 }
 
+/**
+ * Retorna a data atual no fuso America/Sao_Paulo no formato YYYY-MM-DD
+ * CRÍTICO: Garante que o "dia atual" seja sempre baseado no horário local do usuário
+ */
+const getTodayInBrazil = (): string => {
+  const nowUTC = new Date();
+  
+  // Converter para string no fuso America/Sao_Paulo
+  const brazilDateString = nowUTC.toLocaleString('en-US', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  // Parsear a string no formato MM/DD/YYYY para YYYY-MM-DD
+  const [month, day, year] = brazilDateString.split(/[\/,\s]+/);
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+/**
+ * Cria um objeto Date representando uma data específica no fuso America/Sao_Paulo
+ * @param dateString - Data no formato YYYY-MM-DD
+ */
+const createBrazilDate = (dateString: string): Date => {
+  // Criar data no fuso local do Brasil (sem conversão UTC)
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return date;
+};
+
 export default function WeekActivityStreak() {
   const [activities, setActivities] = useState<ActivityDay[]>([]);
-  const { streak, serverToday } = useWeekStreak(); // Usar hook compartilhado com server_today
+  const { streak } = useWeekStreak(); // Usar hook compartilhado
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (serverToday) {
-      loadActivities();
-    }
+    loadActivities();
 
     // Listener para atualizar quando RPC for chamada
     const channel = supabase
@@ -36,21 +65,10 @@ export default function WeekActivityStreak() {
       )
       .subscribe();
 
-    // Atualizar ao voltar do background
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && serverToday) {
-        console.log('[WEEK_ACTIVITY] App voltou ao foco, recarregando...');
-        loadActivities();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       supabase.removeChannel(channel);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [serverToday]);
+  }, []);
 
   const loadActivities = async () => {
     try {
@@ -62,20 +80,15 @@ export default function WeekActivityStreak() {
         return;
       }
 
-      if (!serverToday) {
-        console.log('[WEEK_ACTIVITY] Aguardando server_today...');
-        return;
-      }
-
-      // Buscar janela da semana atual (domingo a sábado)
-      const { startDate, endDate } = getCurrentWeekWindow();
+      // Buscar apenas atividades da semana corrente (domingo a sábado)
+      const { startOfWeek, endOfWeek } = getCurrentWeekRange();
       
       const { data, error } = await supabase
         .from('user_week_activity')
         .select('activity_date')
         .eq('user_id', session.user.id)
-        .gte('activity_date', startDate)
-        .lte('activity_date', endDate)
+        .gte('activity_date', startOfWeek)
+        .lte('activity_date', endOfWeek)
         .order('activity_date', { ascending: false });
 
       if (error) {
@@ -88,10 +101,9 @@ export default function WeekActivityStreak() {
 
       console.log('[WEEK_ACTIVITY] ✅ Atividades carregadas:', {
         total: data?.length || 0,
-        startDate,
-        endDate,
-        serverToday,
-        activities: data?.map(a => a.activity_date),
+        startOfWeek,
+        endOfWeek,
+        todayBrazil: getTodayInBrazil(),
       });
 
       setLoading(false);
@@ -102,104 +114,118 @@ export default function WeekActivityStreak() {
   };
 
   /**
-   * Retorna janela da semana atual (domingo a sábado) baseado em server_today
-   * Sempre ancorado no domingo da semana de "hoje" (America/Sao_Paulo)
+   * Retorna o range da semana corrente no fuso America/Sao_Paulo
+   * startOfWeek: domingo 00:00
+   * endOfWeek: sábado 23:59
+   * 
+   * CORREÇÃO: Usa getTodayInBrazil() para garantir que a semana seja calculada
+   * baseada no dia atual do usuário no Brasil, não em UTC
    */
-  const getCurrentWeekWindow = (): { startDate: string; endDate: string } => {
-    if (!serverToday) {
-      return { startDate: '', endDate: '' };
-    }
+  const getCurrentWeekRange = (): { startOfWeek: string; endOfWeek: string } => {
+    // Obter "hoje" no fuso America/Sao_Paulo (formato YYYY-MM-DD)
+    const todayString = getTodayInBrazil();
+    const today = createBrazilDate(todayString);
+    
+    const currentDayOfWeek = today.getDay(); // 0 = Domingo, 6 = Sábado
+    
+    // Encontrar o domingo da semana atual (startOfWeek)
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - currentDayOfWeek);
+    
+    // Encontrar o sábado da semana atual (endOfWeek)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-    const today = new Date(serverToday + 'T12:00:00Z'); // Usar meio-dia UTC para evitar problemas de fuso
-    const dayOfWeek = today.getUTCDay(); // 0 = domingo, 1 = segunda, ..., 6 = sábado
-    
-    // Calcular o domingo da semana atual
-    const sunday = new Date(today);
-    sunday.setUTCDate(today.getUTCDate() - dayOfWeek);
-    
-    // Calcular o sábado da semana atual
-    const saturday = new Date(sunday);
-    saturday.setUTCDate(sunday.getUTCDate() + 6);
-    
-    const startDate = sunday.toISOString().split('T')[0];
-    const endDate = saturday.toISOString().split('T')[0];
-    
-    console.log('[WEEK_ACTIVITY] Janela da semana:', { startDate, endDate, serverToday, dayOfWeek });
-    
-    return { startDate, endDate };
+    // Formatar datas no formato YYYY-MM-DD
+    const formatDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    return {
+      startOfWeek: formatDate(startOfWeek),
+      endOfWeek: formatDate(endOfWeek),
+    };
   };
 
   /**
-   * Retorna os 7 dias da semana atual (domingo a sábado)
+   * Retorna os 7 dias da semana corrente (domingo a sábado)
    * com informações sobre atividade e estado
+   * 
+   * CORREÇÃO: Usa getTodayInBrazil() para determinar o dia atual
    */
-  const getWeekDays = (): { day: string; date: string; hasActivity: boolean; isToday: boolean; isFuture: boolean }[] => {
-    if (!serverToday) {
-      return [];
-    }
-
-    const { startDate } = getCurrentWeekWindow();
-    const startDateObj = new Date(startDate + 'T12:00:00Z');
+  const getWeekDays = (): { day: string; date: Date; dateString: string; hasActivity: boolean; isFuture: boolean }[] => {
+    const { startOfWeek } = getCurrentWeekRange();
+    const startDate = createBrazilDate(startOfWeek);
     
-    // Rótulos fixos: D S T Q Q S S (domingo → sábado)
+    // Obter "hoje" no fuso America/Sao_Paulo
+    const todayString = getTodayInBrazil();
+
     const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
     
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(startDateObj);
-      date.setUTCDate(startDateObj.getUTCDate() + index);
-      const dateString = date.toISOString().split('T')[0];
+    return weekDays.map((day, index) => {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + index);
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const dayNum = String(date.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${dayNum}`;
       
       const hasActivity = activities.some(
         (activity) => activity.activity_date === dateString
       );
 
-      // Hoje é igual a server_today
-      const isToday = dateString === serverToday;
+      // Dia é futuro se a data for MAIOR que hoje (comparação de strings YYYY-MM-DD)
+      const isFuture = dateString > todayString;
 
-      // Dia futuro é qualquer dia depois de hoje (comparação de strings YYYY-MM-DD)
-      const isFuture = dateString > serverToday;
-
-      // Usar rótulo fixo baseado no índice (domingo = 0, sábado = 6)
-      const day = weekDays[index];
-
-      return { day, date: dateString, hasActivity, isToday, isFuture };
+      return { day, date, dateString, hasActivity, isFuture };
     });
   };
 
   /**
    * Retorna o estilo CSS para cada dia baseado no estado:
-   * - Hoje (server_today): laranja (destaque)
-   * - Dia com registro: amarelo (presente)
-   * - Dia futuro: branco (ainda não aconteceu)
+   * - Hoje: laranja (destaque)
+   * - Dia passado com registro: amarelo (presente)
    * - Dia passado sem registro: cinza escuro (ausente)
+   * - Dia futuro: branco/cinza claro (neutro)
+   * 
+   * CORREÇÃO: Usa getTodayInBrazil() para determinar se é "hoje"
    */
-  const getDayStyle = (dayInfo: { day: string; date: string; hasActivity: boolean; isToday: boolean; isFuture: boolean }) => {
-    // HOJE (server_today): destaque laranja
-    if (dayInfo.isToday) {
-      return 'bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-lg scale-105';
+  const getDayStyle = (dayInfo: { day: string; date: Date; dateString: string; hasActivity: boolean; isFuture: boolean }) => {
+    // Obter "hoje" no fuso America/Sao_Paulo
+    const todayString = getTodayInBrazil();
+    
+    const isToday = dayInfo.dateString === todayString;
+    
+    // HOJE: destaque laranja
+    if (isToday) {
+      return 'bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-lg scale-110';
     }
     
-    // DIA COM REGISTRO: presente (amarelo)
+    // DIA FUTURO: neutro (branco/cinza claro)
+    if (dayInfo.isFuture) {
+      return 'bg-gray-100 text-gray-400 border border-gray-200';
+    }
+    
+    // DIA PASSADO COM REGISTRO: presente (amarelo)
     if (dayInfo.hasActivity) {
       return 'bg-gradient-to-br from-yellow-200 to-yellow-300 text-gray-800';
     }
-
-    // DIA FUTURO: branco com borda (ainda não aconteceu) - mais visível
-    if (dayInfo.isFuture) {
-      return 'bg-white border-2 border-gray-300 text-gray-600';
-    }
     
-    // DIA PASSADO SEM REGISTRO: cinza escuro (ausente)
+    // DIA PASSADO SEM REGISTRO: ausente (cinza escuro)
     return 'bg-gray-700 text-gray-400';
   };
 
-  if (loading || !serverToday) {
+  if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-md p-6 animate-pulse">
         <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
-        <div className="flex justify-between gap-1.5">
+        <div className="flex justify-between gap-2">
           {[...Array(7)].map((_, i) => (
-            <div key={i} className="flex-1 aspect-square rounded-full bg-gray-200 max-w-[44px]"></div>
+            <div key={i} className="flex-1 aspect-square rounded-full bg-gray-200"></div>
           ))}
         </div>
       </div>
@@ -207,8 +233,6 @@ export default function WeekActivityStreak() {
   }
 
   const weekDays = getWeekDays();
-
-  console.log('[WEEK_ACTIVITY] Renderizando semana:', weekDays);
 
   return (
     <div className="bg-white rounded-2xl shadow-md p-6">
@@ -219,15 +243,13 @@ export default function WeekActivityStreak() {
         </h2>
       </div>
       
-      <div className="flex justify-between gap-1.5">
+      <div className="flex justify-between gap-2">
         {weekDays.map((dayInfo, index) => (
-          <div key={index} className="flex flex-col items-center gap-1 flex-1 max-w-[44px]">
-            <div
-              className={`w-full aspect-square rounded-full flex items-center justify-center font-semibold text-xs transition-all ${getDayStyle(dayInfo)}`}
-              title={`${dayInfo.date} - ${dayInfo.isToday ? 'Hoje' : dayInfo.isFuture ? 'Futuro' : dayInfo.hasActivity ? 'Presente' : 'Ausente'}`}
-            >
-              {dayInfo.day}
-            </div>
+          <div
+            key={index}
+            className={`flex-1 aspect-square rounded-full flex items-center justify-center font-semibold transition-all ${getDayStyle(dayInfo)}`}
+          >
+            {dayInfo.day}
           </div>
         ))}
       </div>

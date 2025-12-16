@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, consecutiveDays, lastAccessDate, onboardingCompleted } = body;
+    const { userId, consecutiveDays, lastAccessDate, onboardingCompleted, trialStartedAt } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
@@ -75,14 +75,21 @@ export async function POST(request: NextRequest) {
     let result;
     if (existingData) {
       // Atualizar dados existentes
+      const updateData: any = {
+        consecutive_days: consecutiveDays,
+        last_access_date: lastAccessDate,
+        onboarding_completed: onboardingCompleted,
+        updated_at: new Date().toISOString()
+      };
+
+      // Adicionar trial_started_at apenas se fornecido
+      if (trialStartedAt !== undefined) {
+        updateData.trial_started_at = trialStartedAt;
+      }
+
       const { data, error } = await supabaseAdmin
         .from('user_data')
-        .update({
-          consecutive_days: consecutiveDays,
-          last_access_date: lastAccessDate,
-          onboarding_completed: onboardingCompleted,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('user_id', userId)
         .select()
         .single();
@@ -91,14 +98,21 @@ export async function POST(request: NextRequest) {
       result = data;
     } else {
       // Criar novos dados
+      const insertData: any = {
+        user_id: userId,
+        consecutive_days: consecutiveDays || 0,
+        last_access_date: lastAccessDate,
+        onboarding_completed: onboardingCompleted || false
+      };
+
+      // Adicionar trial_started_at apenas se fornecido
+      if (trialStartedAt !== undefined) {
+        insertData.trial_started_at = trialStartedAt;
+      }
+
       const { data, error } = await supabaseAdmin
         .from('user_data')
-        .insert({
-          user_id: userId,
-          consecutive_days: consecutiveDays || 0,
-          last_access_date: lastAccessDate,
-          onboarding_completed: onboardingCompleted || false
-        })
+        .insert(insertData)
         .select()
         .single();
 

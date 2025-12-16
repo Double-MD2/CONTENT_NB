@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, User, Camera, Heart, DollarSign, Calendar, Edit2, ShoppingCart, LogOut, Award, TrendingUp, Star } from 'lucide-react';
+import { X, User, Camera, Heart, DollarSign, Calendar, Edit2, ShoppingCart, LogOut, Award, TrendingUp, Star, Clock } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/contexts/SidebarContext';
-import { useWeekStreak } from '@/hooks/useWeekStreak';
+import { useSubscription } from '@/hooks/useSubscription';
+import Frequency30Days from './Frequency30Days';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,14 +22,12 @@ interface ActivityDay {
 export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: SidebarProps) {
   const router = useRouter();
   const { setIsSidebarOpen } = useSidebar();
-  
-  // Hook compartilhado para streak - SINCRONIZADO com WeekActivityStreak e HomePage
-  const { streak: consecutiveDays, serverToday } = useWeekStreak();
-  
+  const { isInTrial, trialDaysRemaining, isActive: hasActiveSubscription } = useSubscription();
   const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>(initialTab);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
+  const [consecutiveDays, setConsecutiveDays] = useState(0);
   const [activities, setActivities] = useState<ActivityDay[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [loginCount, setLoginCount] = useState(0);
@@ -59,11 +58,6 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
         return;
       }
 
-      if (!serverToday) {
-        console.log('[SIDEBAR] Aguardando server_today...');
-        return;
-      }
-
       // Buscar últimos 30 dias de atividade do banco de dados
       const { data, error } = await supabase
         .from('user_week_activity')
@@ -79,14 +73,52 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
 
       setActivities(data || []);
 
+      // Calcular streak (dias consecutivos)
+      const streak = calculateStreak(data || []);
+      setConsecutiveDays(streak);
+
       console.log('[SIDEBAR] ✅ Atividades carregadas:', {
         total: data?.length || 0,
-        streak: consecutiveDays,
-        serverToday,
+        streak,
       });
     } catch (err) {
       console.error('[SIDEBAR] Exceção ao carregar atividades:', err);
     }
+  };
+
+  const calculateStreak = (activities: ActivityDay[]): number => {
+    if (activities.length === 0) return 0;
+
+    // Ordenar por data decrescente (mais recente primeiro)
+    const sortedActivities = [...activities].sort(
+      (a, b) => new Date(b.activity_date).getTime() - new Date(a.activity_date).getTime()
+    );
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Encontrar o dia mais recente com atividade
+    const mostRecentActivity = new Date(sortedActivities[0].activity_date);
+    mostRecentActivity.setHours(0, 0, 0, 0);
+
+    let streak = 0;
+    let currentDate = new Date(mostRecentActivity);
+
+    // Contar dias consecutivos a partir do dia mais recente com atividade
+    for (const activity of sortedActivities) {
+      const activityDate = new Date(activity.activity_date);
+      activityDate.setHours(0, 0, 0, 0);
+
+      if (activityDate.getTime() === currentDate.getTime()) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else if (activityDate.getTime() < currentDate.getTime()) {
+        // Se há um gap, a sequência termina
+        break;
+      }
+    }
+
+    return streak;
   };
 
   const loadUserProfile = async () => {
@@ -429,6 +461,25 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
           {/* Account Tab */}
           {activeTab === 'account' && (
             <div className="space-y-6">
+              {/* Contador de Trial - Mostrar APENAS se estiver no trial E não tiver assinatura ativa */}
+              {isInTrial && !hasActiveSubscription && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-amber-400 p-2 rounded-full">
+                      <Clock className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-800">Teste Gratuito</p>
+                      <p className="text-xs text-gray-600">
+                        {trialDaysRemaining === 1 
+                          ? '1 dia restante' 
+                          : `${trialDaysRemaining} dias restantes`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="text-center">
                 <div className="relative inline-block mb-4">
                   <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto overflow-hidden">
@@ -466,14 +517,24 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                     <p className="mt-1 text-gray-900">{profile.religion || 'Não informada'}</p>
                   </div>
 
-
-
                   <button
                     onClick={() => setIsEditing(true)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-400 text-white rounded-xl font-semibold hover:bg-amber-500 transition-colors"
                   >
                     <Edit2 className="w-5 h-5" />
                     Editar Perfil
+                  </button>
+
+                  {/* Botão sutil para Planos */}
+                  <button
+                    onClick={() => {
+                      router.push('/plans');
+                      onClose();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                  >
+                    <Star className="w-4 h-4" />
+                    Ver Planos Premium
                   </button>
 
                   {/* Botão de Sair */}
@@ -631,43 +692,8 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                 </div>
               </div>
 
-              {/* Calendário de Frequência */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Últimos 30 dias
-                </p>
-                <div className="grid grid-cols-7 gap-2">
-                  {last30Days.map((day, index) => {
-                    const dayOfMonth = day.date.getDate();
-                    const isToday = day.date.toDateString() === new Date().toDateString();
-                    
-                    return (
-                      <div key={index} className="text-center">
-                        <div
-                          className={`w-full aspect-square rounded-lg mb-1 transition-all duration-300 flex items-center justify-center text-xs font-semibold ${
-                            day.hasActivity
-                              ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-md transform hover:scale-110'
-                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                          } ${isToday ? 'ring-2 ring-amber-600 ring-offset-2' : ''}`}
-                        >
-                          {dayOfMonth}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gradient-to-br from-amber-400 to-amber-500 rounded" />
-                    <span>Acessado</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gray-100 rounded" />
-                    <span>Não acessado</span>
-                  </div>
-                </div>
-              </div>
+              {/* Componente de Frequência (30 dias) */}
+              <Frequency30Days />
 
               {/* Badges de Conquistas */}
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border-2 border-purple-100">

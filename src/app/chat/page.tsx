@@ -1,197 +1,98 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles, Calendar, MessageCircle, Heart } from 'lucide-react';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Olá! Sou seu assistente espiritual cristão. Como posso ajudá-lo hoje? Posso conversar sobre a Bíblia, fé, oração, reflexões bíblicas e sua jornada espiritual.'
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    
-    // Adicionar mensagem do usuário
-    const newMessages = [...messages, { role: 'user' as const, content: userMessage }];
-    setMessages(newMessages);
-    setIsLoading(true);
-
-    try {
-      // Chamar o endpoint /api/chat-free
-      const res = await fetch('/api/chat-free', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: userMessage,
-          history: messages.slice(-6) // Últimas 6 mensagens para contexto
-        })
-      });
-
-      // Ler o corpo ANTES de verificar response.ok
-      const ct = res.headers.get('content-type') || '';
-      const payload = ct.includes('application/json') 
-        ? await res.json() 
-        : { raw: await res.text() };
-
-      // Se response.ok for false, NÃO lançar erro - exibir na UI
-      if (!res.ok) {
-        console.error({
-          status: res.status,
-          url: res.url,
-          payload
-        });
-
-        // Exibir mensagem de erro na UI
-        const errorMessage = payload.error || payload.answer || `Erro (status ${res.status})`;
-        
-        setMessages([...newMessages, { 
-          role: 'assistant', 
-          content: errorMessage
-        }]);
-        return;
-      }
-
-      // Sucesso: adicionar resposta do assistente
-      setMessages([...newMessages, { 
-        role: 'assistant', 
-        content: payload.answer || 'Desculpe, não consegui gerar uma resposta.'
-      }]);
-
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', {
-        error,
-        message: error instanceof Error ? error.message : 'Erro desconhecido'
-      });
-      
-      // Tratar timeout/CORS com mensagem amigável
-      let errorMessage = '❌ Desculpe, ocorreu um erro ao processar sua mensagem.';
-      
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = '❌ Erro de conexão. Verifique sua internet e tente novamente.';
-      }
-      
-      setMessages([
-        ...newMessages,
-        {
-          role: 'assistant',
-          content: errorMessage
-        }
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+export default function ChatComingSoon() {
   return (
-    <div className="flex flex-col bg-gradient-to-b from-pink-50 to-white" style={{ height: 'calc(100vh - 80px)' }}>
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 via-purple-50 to-white">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-pink-100 flex-shrink-0">
+      <header className="bg-white shadow-sm border-b border-pink-100">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-500 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">Chat Espiritual</h1>
-              <p className="text-xs text-gray-500">Converse sobre fé e Bíblia</p>
+              <p className="text-xs text-gray-500">Em desenvolvimento</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="container mx-auto max-w-3xl">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-gradient-to-br from-pink-400 to-pink-500 text-white'
-                    : 'bg-white shadow-md text-gray-800 border border-pink-100'
-                }`}
-              >
-                {message.role === 'assistant' && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-pink-500" />
-                    <span className="text-xs font-semibold text-pink-600">Assistente Cristão</span>
-                  </div>
-                )}
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-              </div>
-            </div>
-          ))}
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-12 max-w-2xl">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full mb-6 shadow-lg">
+            <Sparkles className="w-10 h-10 text-white" />
+          </div>
           
-          {isLoading && (
-            <div className="flex justify-start mb-4">
-              <div className="bg-white shadow-md rounded-2xl px-4 py-3 border border-pink-100">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-pink-500 animate-spin" />
-                  <span className="text-sm text-gray-600">Pensando...</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <h2 className="text-3xl font-bold text-gray-800 mb-3">
+            Em Breve
+          </h2>
           
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Input Area */}
-      <div className="bg-white border-t border-pink-100 shadow-lg flex-shrink-0">
-        <div className="container mx-auto max-w-3xl px-4 py-4">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Pergunte sobre a Bíblia, fé, oração..."
-              disabled={isLoading}
-              className="flex-1 px-4 py-3 border border-pink-200 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="bg-gradient-to-br from-pink-400 to-pink-500 text-white p-3 rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-            >
-              {isLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                <Send className="w-6 h-6" />
-              )}
-            </button>
-          </form>
-          
-          <p className="text-xs text-center text-gray-400 mt-2">
-            Chat bíblico gratuito • Powered by Gemini AI
+          <p className="text-lg text-gray-600 mb-8">
+            Estamos preparando algo especial para você!
           </p>
         </div>
+
+        {/* Feature Card */}
+        <div className="bg-white rounded-2xl shadow-xl border border-pink-100 p-8 mb-8">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <MessageCircle className="w-6 h-6 text-pink-500" />
+            O que será o Chat Espiritual?
+          </h3>
+          
+          <p className="text-gray-600 leading-relaxed mb-6">
+            Uma experiência única de conversa guiada pela sabedoria bíblica, onde você poderá:
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 text-pink-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Estudar a Bíblia</h4>
+                <p className="text-sm text-gray-600">Tire dúvidas sobre passagens, contextos históricos e ensinamentos bíblicos</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Heart className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Fortalecer sua Fé</h4>
+                <p className="text-sm text-gray-600">Receba orientações espirituais baseadas nos princípios cristãos</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Reflexões Personalizadas</h4>
+                <p className="text-sm text-gray-600">Converse sobre sua jornada espiritual e receba insights relevantes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Coming Soon Badge */}
+        <div className="bg-gradient-to-r from-pink-400 to-purple-500 rounded-2xl p-6 text-center text-white shadow-lg">
+          <Calendar className="w-8 h-8 mx-auto mb-3" />
+          <p className="font-semibold text-lg mb-2">Lançamento em breve</p>
+          <p className="text-sm text-pink-100">
+            Estamos trabalhando para trazer a melhor experiência de chat espiritual para você
+          </p>
+        </div>
+
+        {/* Footer Note */}
+        <p className="text-center text-sm text-gray-500 mt-8">
+          Continue explorando as outras funcionalidades do app enquanto preparamos esta novidade! 🙏
+        </p>
       </div>
     </div>
   );

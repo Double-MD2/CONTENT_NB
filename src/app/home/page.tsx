@@ -7,8 +7,10 @@ import Sidebar from '@/components/custom/sidebar';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useIncrementLoginOnce } from '@/hooks/useIncrementLoginOnce';
+import { useLogDailyLogin } from '@/hooks/useLogDailyLogin';
 import WeekActivityStreak from '@/components/custom/WeekActivityStreak';
 import { useWeekStreak } from '@/hooks/useWeekStreak';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const mockContents: DailyContent[] = [
   {
@@ -65,7 +67,36 @@ const mockContents: DailyContent[] = [
   },
 ];
 
-const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+/**
+ * Retorna a data atual no fuso America/Sao_Paulo no formato YYYY-MM-DD
+ * CRÍTICO: Garante que o "dia atual" seja sempre baseado no horário local do usuário
+ */
+const getTodayInBrazil = (): string => {
+  const nowUTC = new Date();
+  
+  // Converter para string no fuso America/Sao_Paulo
+  const brazilDateString = nowUTC.toLocaleString('en-US', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  // Parsear a string no formato MM/DD/YYYY para YYYY-MM-DD
+  const [month, day, year] = brazilDateString.split(/[\/,\s]+/);
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+/**
+ * Cria um objeto Date representando uma data específica no fuso America/Sao_Paulo
+ * @param dateString - Data no formato YYYY-MM-DD
+ */
+const createBrazilDate = (dateString: string): Date => {
+  // Criar data no fuso local do Brasil (sem conversão UTC)
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return date;
+};
 
 export default function HomePage() {
   const router = useRouter();
@@ -73,13 +104,18 @@ export default function HomePage() {
   // Hook para incrementar login stats 1x por sessão
   useIncrementLoginOnce();
   
+  // Hook para registrar acesso diário no Supabase (log_daily_login RPC)
+  useLogDailyLogin();
+  
   // Hook compartilhado para streak - SINCRONIZADO com WeekActivityStreak
   const { streak } = useWeekStreak();
+  
+  // Hook de verificação de assinatura
+  const { isActive: hasAccess, isInTrial, loading: subscriptionLoading } = useSubscription();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
-  const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,8 +238,14 @@ export default function HomePage() {
     }
   };
 
+  /**
+   * Calcula quais dias da semana atual foram acessados
+   * CORREÇÃO: Usa getTodayInBrazil() para determinar a semana atual no fuso local
+   */
   const calculateWeeklyAccess = (history: any[]): boolean[] => {
-    const today = new Date();
+    // Obter "hoje" no fuso America/Sao_Paulo
+    const todayString = getTodayInBrazil();
+    const today = createBrazilDate(todayString);
     const currentDayOfWeek = today.getDay(); // 0 = Domingo, 6 = Sábado
     
     // Encontrar o domingo da semana atual
@@ -218,7 +260,7 @@ export default function HomePage() {
     for (let i = 0; i < 7; i++) {
       const checkDate = new Date(startOfWeek);
       checkDate.setDate(startOfWeek.getDate() + i);
-      const dateString = checkDate.toISOString().split('T')[0];
+      const dateString = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
       
       // Verificar se existe registro de acesso para este dia
       const accessed = history.some(record => {
@@ -234,6 +276,9 @@ export default function HomePage() {
 
   const createInitialUserData = async (currentUserId: string) => {
     try {
+      // Obter "hoje" no fuso America/Sao_Paulo
+      const todayString = getTodayInBrazil();
+      
       // Criar dados iniciais do usuário
       await fetch('/api/user', {
         method: 'POST',
@@ -247,17 +292,18 @@ export default function HomePage() {
       });
 
       // Criar histórico inicial dos últimos 30 dias
-      const today = new Date();
+      const today = createBrazilDate(todayString);
       for (let i = 29; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
+        const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         await fetch('/api/access-history', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: currentUserId,
-            accessDate: date.toISOString().split('T')[0],
+            accessDate: dateString,
             accessed: i === 0 // Apenas hoje está acessado
           })
         });
@@ -265,7 +311,8 @@ export default function HomePage() {
       
       // Atualizar acesso semanal
       const weekAccess = [false, false, false, false, false, false, false];
-      weekAccess[new Date().getDay()] = true;
+      const todayDate = createBrazilDate(todayString);
+      weekAccess[todayDate.getDay()] = true;
       setWeeklyAccess(weekAccess);
     } catch (error) {
       console.error('Erro ao criar dados iniciais:', error);
@@ -274,14 +321,15 @@ export default function HomePage() {
 
   const registerTodayAccess = async (currentUserId: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // Obter "hoje" no fuso America/Sao_Paulo
+      const todayString = getTodayInBrazil();
       
       await fetch('/api/access-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: currentUserId,
-          accessDate: today,
+          accessDate: todayString,
           accessed: true
         })
       });
@@ -324,7 +372,19 @@ export default function HomePage() {
     setExpandedCard(expandedCard === id ? null : id);
   };
 
+  /**
+   * CORRIGIDO: Verifica acesso premium antes de navegar para CARDS
+   * Cards são conteúdo PREMIUM - requerem assinatura ou trial
+   */
   const handleCardClick = (content: DailyContent) => {
+    // Verificar se tem acesso premium
+    if (!hasAccess) {
+      console.log('[HOME] Acesso premium negado (card) - redirecionando para planos');
+      router.push('/plans');
+      return;
+    }
+
+    // Tem acesso - navegar normalmente
     if (content.type === 'gratitude') {
       window.location.href = '/gratitude';
     } else if (content.type === 'lectionary') {
@@ -338,8 +398,17 @@ export default function HomePage() {
     }
   };
 
-  const handleBibleClick = () => {
-    window.location.href = '/bible';
+  /**
+   * Verifica acesso premium antes de navegar para botões de acesso rápido
+   * Se não tem acesso, redireciona para /plans
+   */
+  const handlePremiumClick = (route: string) => {
+    if (!hasAccess) {
+      console.log('[HOME] Acesso premium negado - redirecionando para planos');
+      router.push('/plans');
+    } else {
+      router.push(route);
+    }
   };
 
   const openSidebarWithTab = (tab: 'account' | 'contribute' | 'frequency' | 'store') => {
@@ -347,24 +416,7 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
-  const getDayStyle = (index: number) => {
-    const today = new Date().getDay();
-    const isToday = index === today;
-    const isAccessed = weeklyAccess[index];
-    
-    if (isToday) {
-      // Dia atual - laranja
-      return 'bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-lg scale-110';
-    } else if (isAccessed) {
-      // Dia acessado - amarelo claro
-      return 'bg-gradient-to-br from-yellow-200 to-yellow-300 text-gray-800';
-    } else {
-      // Dia não acessado - cinza escuro
-      return 'bg-gray-700 text-gray-400';
-    }
-  };
-
-  if (loading) {
+  if (loading || subscriptionLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
         <div className="text-center">
@@ -407,13 +459,28 @@ export default function HomePage() {
       </header>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Trial Banner - Mostrar apenas se estiver no trial */}
+        {isInTrial && (
+          <div className="mb-6 bg-gradient-to-r from-amber-400 to-amber-600 rounded-2xl p-4 text-white shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-full">
+                <Star className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold">Período de Teste Ativo</p>
+                <p className="text-sm text-white/90">Você tem acesso completo por 3 dias!</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Weekly Calendar - Componente com dados do Supabase */}
         <WeekActivityStreak />
 
-        {/* Quick Access Buttons */}
+        {/* Quick Access Buttons - TODOS OS BOTÕES SÃO PREMIUM EXCETO SIDEBAR */}
         <div className="grid grid-cols-4 gap-3 mb-6 mt-8">
           <button 
-            onClick={handleBibleClick}
+            onClick={() => handlePremiumClick('/bible')}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
             <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
@@ -453,7 +520,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Content Cards */}
+        {/* Content Cards - TODOS OS CARDS SÃO PREMIUM */}
         <div className="space-y-4">
           {contents.map((content) => (
             <div

@@ -4,6 +4,7 @@ import { Home, BookOpen, Heart } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export default function BottomNav() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function BottomNav() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const navRef = useRef<HTMLElement>(null);
   const { isSidebarOpen } = useSidebar();
+  const { isActive: hasAccess } = useSubscription();
 
   const isActive = (path: string) => {
     if (path === '/home') {
@@ -62,6 +64,28 @@ export default function BottomNav() {
     return null;
   }
 
+  /**
+   * Verifica acesso premium antes de navegar
+   * Bíblia e Favoritos são PREMIUM - requerem assinatura ou trial
+   */
+  const handleNavigation = (path: string) => {
+    // Início é sempre liberado
+    if (path === '/home') {
+      router.push(path);
+      return;
+    }
+
+    // Bíblia e Favoritos requerem acesso premium
+    if (!hasAccess) {
+      console.log('[BOTTOM_NAV] Acesso premium negado - redirecionando para planos');
+      router.push('/plans');
+      return;
+    }
+
+    // Tem acesso - navegar normalmente
+    router.push(path);
+  };
+
   return (
     <nav 
       ref={navRef}
@@ -72,7 +96,7 @@ export default function BottomNav() {
       <div className="container mx-auto px-4">
         <div className="flex justify-around py-3">
           <button
-            onClick={() => router.push('/home')}
+            onClick={() => handleNavigation('/home')}
             className={`flex flex-col items-center gap-1 transition-colors ${
               isActive('/home')
                 ? 'text-amber-500'
@@ -84,27 +108,33 @@ export default function BottomNav() {
           </button>
           
           <button
-            onClick={() => router.push('/bible')}
-            className={`flex flex-col items-center gap-1 transition-colors ${
+            onClick={() => handleNavigation('/bible')}
+            className={`flex flex-col items-center gap-1 transition-colors relative ${
               isActive('/bible')
                 ? 'text-blue-500'
                 : 'text-gray-400 hover:text-gray-600'
-            }`}
+            } ${!hasAccess ? 'opacity-60' : ''}`}
           >
             <BookOpen className="w-6 h-6" />
             <span className="text-xs font-medium">Bíblia</span>
+            {!hasAccess && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white"></div>
+            )}
           </button>
           
           <button
-            onClick={() => router.push('/favorites')}
-            className={`flex flex-col items-center gap-1 transition-colors ${
+            onClick={() => handleNavigation('/favorites')}
+            className={`flex flex-col items-center gap-1 transition-colors relative ${
               isActive('/favorites')
                 ? 'text-amber-500'
                 : 'text-gray-400 hover:text-gray-600'
-            }`}
+            } ${!hasAccess ? 'opacity-60' : ''}`}
           >
             <Heart className="w-6 h-6" />
             <span className="text-xs font-medium">Favoritos</span>
+            {!hasAccess && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white"></div>
+            )}
           </button>
         </div>
       </div>
