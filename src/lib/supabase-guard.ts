@@ -154,6 +154,29 @@ export async function safeSupabaseRPC<T = any>(
 }
 
 /**
+ * Verifica se um erro é válido e estruturado
+ * Retorna true apenas se o erro contiver informações relevantes
+ */
+function isValidError(error: any): boolean {
+  if (!error) return false;
+  if (typeof error !== 'object') return false;
+  
+  // Verificar se é um objeto vazio
+  const keys = Object.keys(error);
+  if (keys.length === 0) return false;
+  
+  // Verificar se contém pelo menos uma propriedade relevante
+  const hasRelevantProperty = 
+    error.message || 
+    error.code || 
+    error.details || 
+    error.hint || 
+    error.status;
+  
+  return !!hasRelevantProperty;
+}
+
+/**
  * Wrapper seguro para queries ao Supabase
  * Valida antes de executar e trata erros de forma segura
  */
@@ -181,7 +204,18 @@ export async function safeSupabaseQuery<T = any>(
 
     const { data, error } = await Promise.race([queryBuilder, timeoutPromise]);
 
+    // Validação defensiva: verificar se o erro é válido e estruturado
     if (error) {
+      if (!isValidError(error)) {
+        // Erro vazio ou sem propriedades relevantes - retornar silenciosamente
+        console.log('[SAFE_QUERY] ⏭️ Erro vazio detectado, ignorando (timing de autenticação)');
+        return {
+          data: null,
+          error: null,
+        };
+      }
+      
+      // Erro real e estruturado - logar e retornar
       console.error('[SAFE_QUERY] ❌ Erro na query:', error);
       return {
         data: null,

@@ -33,7 +33,7 @@ const plans: Plan[] = [
       'Chat com IA',
       'Sem anúncios',
     ],
-    kirvanoLink: 'https://pay.kirvano.com/seu-link-mensal',
+    kirvanoLink: 'https://pay.kirvano.com/8dbcf4dd-7c2d-48fc-b380-87b5d513e5e8',
   },
   {
     id: 'semester',
@@ -51,7 +51,7 @@ const plans: Plan[] = [
       'Sem anúncios',
       'Economia de 28%',
     ],
-    kirvanoLink: 'https://pay.kirvano.com/seu-link-semestral',
+    kirvanoLink: 'https://pay.kirvano.com/b8122513-33d0-4312-b63d-f36c67c9db4f',
   },
   {
     id: 'annual',
@@ -68,7 +68,7 @@ const plans: Plan[] = [
       'Sem anúncios',
       'Economia de 40%',
     ],
-    kirvanoLink: 'https://pay.kirvano.com/seu-link-anual',
+    kirvanoLink: 'https://pay.kirvano.com/342ac510-4486-495d-86fe-d61d264d263b',
   },
   {
     id: 'lifetime',
@@ -86,7 +86,7 @@ const plans: Plan[] = [
       'Pagamento único',
       'Acesso vitalício',
     ],
-    kirvanoLink: 'https://pay.kirvano.com/seu-link-vitalicio',
+    kirvanoLink: 'https://pay.kirvano.com/055620aa-9552-4b20-973f-942186415e29',
   },
 ];
 
@@ -99,7 +99,7 @@ export default function PlansPage() {
     
     // Redirecionar para link de pagamento da Kirvano
     // O webhook da Kirvano atualizará automaticamente a tabela user_subscriptions
-    window.open(plan.kirvanoLink, '_blank');
+    window.location.href = plan.kirvanoLink;
   };
 
   const calculateDiscount = (original: number, current: number) => {
@@ -113,7 +113,7 @@ export default function PlansPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/home')}
               className="text-gray-600 hover:text-gray-900 transition-colors"
             >
               ← Voltar

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, User, Camera, Heart, DollarSign, Calendar, Edit2, ShoppingCart, LogOut, Award, TrendingUp, Star, Clock } from 'lucide-react';
+import { X, User, Camera, Heart, DollarSign, Calendar, Edit2, ShoppingCart, LogOut, Award, TrendingUp, Star, Clock, ChevronRight, LifeBuoy, MessageCircle, Mail, XCircle } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -32,6 +32,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
   const [userId, setUserId] = useState<string | null>(null);
   const [loginCount, setLoginCount] = useState(0);
   const [lastLoginAt, setLastLoginAt] = useState<string | null>(null);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -517,34 +518,76 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                     <p className="mt-1 text-gray-900">{profile.religion || 'Não informada'}</p>
                   </div>
 
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-400 text-white rounded-xl font-semibold hover:bg-amber-500 transition-colors"
-                  >
-                    <Edit2 className="w-5 h-5" />
-                    Editar Perfil
-                  </button>
+                  {/* Lista de opções moderna - estilo YouTube/Mercado Livre */}
+                  <div className="space-y-2 mt-6">
+                    {/* Editar Perfil */}
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Edit2 className="w-5 h-5 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-800">Editar Perfil</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
 
-                  {/* Botão sutil para Planos */}
-                  <button
-                    onClick={() => {
-                      router.push('/plans');
-                      onClose();
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    <Star className="w-4 h-4" />
-                    Ver Planos Premium
-                  </button>
+                    {/* Ver Planos Premium */}
+                    <button
+                      onClick={() => {
+                        router.push('/plans');
+                        onClose();
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Star className="w-5 h-5 text-amber-500" />
+                        <span className="text-sm font-medium text-gray-800">Ver Planos Premium</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
 
-                  {/* Botão de Sair */}
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    Sair
-                  </button>
+                    {/* Suporte */}
+                    <button
+                      onClick={() => setShowSupportModal(true)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <LifeBuoy className="w-5 h-5 text-blue-500" />
+                        <span className="text-sm font-medium text-gray-800">Suporte</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Zona de perigo - Sair e Cancelar Assinatura */}
+                  <div className="mt-8 pt-6 border-t border-gray-200 space-y-2">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-red-50 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <LogOut className="w-5 h-5 text-red-500" />
+                        <span className="text-sm font-medium text-red-500">Sair</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-red-400" />
+                    </button>
+
+                    {/* Cancelar Assinatura */}
+                    <button
+                      onClick={() => {
+                        router.push('/cancel-subscription');
+                        onClose();
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-orange-50 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <XCircle className="w-5 h-5 text-orange-500" />
+                        <span className="text-sm font-medium text-orange-500">Cancelar assinatura</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-orange-400" />
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -834,6 +877,64 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
           )}
         </div>
       </div>
+
+      {/* Modal de Suporte */}
+      {showSupportModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-[60] transition-opacity"
+            onClick={() => setShowSupportModal(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-white rounded-2xl shadow-2xl z-[70] p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <LifeBuoy className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Fale com o Suporte</h3>
+              <p className="text-sm text-gray-600">
+                Escolha como prefere entrar em contato
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* WhatsApp */}
+              <a
+                href="http://wa.me/5564992016685"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border-2 border-green-200"
+              >
+                <MessageCircle className="w-6 h-6 text-green-600" />
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-semibold text-gray-800">Por WhatsApp</p>
+                  <p className="text-xs text-gray-600">Resposta rápida</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              </a>
+
+              {/* E-mail */}
+              <a
+                href="mailto:md2.double@gmail.com"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border-2 border-blue-200"
+              >
+                <Mail className="w-6 h-6 text-blue-600" />
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-semibold text-gray-800">Via E-mail</p>
+                  <p className="text-xs text-gray-600">md2.double@gmail.com</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              </a>
+            </div>
+
+            <button
+              onClick={() => setShowSupportModal(false)}
+              className="w-full mt-4 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold text-gray-700 transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </>
+      )}
     </>
   );
 }

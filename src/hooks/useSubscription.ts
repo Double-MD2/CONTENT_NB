@@ -16,21 +16,21 @@ export interface SubscriptionStatus {
 /**
  * Hook para gerenciar status de assinatura e período de teste
  * 
- * REGRAS DE PRIORIDADE:
- * 1. Verifica se está no trial de 3 dias (prioridade máxima)
- * 2. Se não estiver no trial, verifica assinatura ativa
- * 3. Se nenhuma das duas, bloqueia acesso premium
+ * NOVA LÓGICA PROFISSIONAL:
+ * - NÃO calcula trial usando created_at do auth
+ * - Depende EXCLUSIVAMENTE da tabela user_subscriptions
+ * - Apenas CONSULTA o Supabase, nunca cria/atualiza registros
+ * - Usuários sem registro válido = SEM ACESSO
+ * 
+ * REGRAS:
+ * 1. Se status = 'trialing' E trial_end > hoje -> ACESSO LIBERADO (trial ativo)
+ * 2. Se status = 'active' -> ACESSO LIBERADO (assinatura ativa)
+ * 3. Qualquer outro caso -> ACESSO BLOQUEADO
  * 
  * SEGURANÇA:
- * - Valida conexão e autenticação antes de qualquer chamada
- * - Em caso de erro, assume estado seguro (SEM acesso premium)
- * - Não libera acesso indevido em caso de falha de rede
- * 
- * TRIAL:
- * - Todo usuário novo recebe 3 dias de trial gratuito
- * - Trial inicia automaticamente no primeiro login
- * - Registra trial_started_at no user_metadata do Supabase Auth
- * - Usa created_at da conta como referência para contas antigas
+ * - Em caso de erro, assume estado seguro (SEM acesso)
+ * - Não libera acesso indevido em caso de falha
+ * - Usuários antigos sem registro = SEM ACESSO (evita brechas)
  */
 export function useSubscription() {
   const [status, setStatus] = useState<SubscriptionStatus>({
@@ -70,54 +70,29 @@ export function useSubscription() {
       const userId = guard.user!.id;
       console.log('[useSubscription] ✅ Usuário autenticado:', userId);
 
-      // 2. PRIORIDADE 1: Verificar período de trial (3 dias)
-      const trialStatus = await checkTrialStatus(userId);
-      console.log('[useSubscription] Trial status:', trialStatus);
+      // CONSULTAR TABELA user_subscriptions (ÚNICA FONTE DE VERDADE)
+      const subscriptionStatus = await checkUserSubscription(userId);
       
-      if (trialStatus.isInTrial) {
-        // Ainda está no trial - libera acesso total
-        console.log('[useSubscription] ✅ Usuário no trial - ACESSO LIBERADO', {
-          daysRemaining: trialStatus.daysRemaining,
-          trialEndsAt: trialStatus.trialEndsAt
-        });
+      if (!subscriptionStatus) {
+        // Sem registro válido = SEM ACESSO
+        console.log('[useSubscription] ❌ Sem registro válido em user_subscriptions - ACESSO BLOQUEADO');
         setStatus({
-          isActive: true,
-          isInTrial: true,
-          trialEndsAt: trialStatus.trialEndsAt,
-          trialDaysRemaining: trialStatus.daysRemaining,
-          planName: 'Trial Gratuito',
+          isActive: false,
+          isInTrial: false,
+          trialEndsAt: null,
+          trialDaysRemaining: 0,
+          planName: null,
           loading: false,
         });
         return;
       }
 
-      console.log('[useSubscription] ⏰ Trial expirado ou não existe - verificando assinatura...');
-
-      // 3. PRIORIDADE 2: Trial acabou - verificar assinatura no Supabase
-      const subscriptionActive = await checkActiveSubscription(userId);
-      
-      if (subscriptionActive) {
-        console.log('[useSubscription] ✅ Assinatura ativa - ACESSO LIBERADO');
-        setStatus({
-          isActive: true,
-          isInTrial: false,
-          trialEndsAt: trialStatus.trialEndsAt,
-          trialDaysRemaining: 0,
-          planName: subscriptionActive.planName,
-          loading: false,
-        });
-      } else {
-        // Não tem assinatura ativa - bloquear acesso
-        console.log('[useSubscription] ❌ Sem trial e sem assinatura - ACESSO BLOQUEADO');
-        setStatus({
-          isActive: false,
-          isInTrial: false,
-          trialEndsAt: trialStatus.trialEndsAt,
-          trialDaysRemaining: 0,
-          planName: null,
-          loading: false,
-        });
-      }
+      // Tem registro válido - aplicar status
+      console.log('[useSubscription] ✅ Status válido encontrado:', subscriptionStatus);
+      setStatus({
+        ...subscriptionStatus,
+        loading: false,
+      });
     } catch (error) {
       console.error('[useSubscription] ❌ Erro ao verificar status:', error);
       console.log('[useSubscription] ❌ ESTADO SEGURO: Bloqueando acesso premium');
@@ -134,209 +109,126 @@ export function useSubscription() {
   };
 
   /**
-   * Verifica se usuário ainda está no período de trial de 3 dias
-   * Usa user_metadata do Supabase Auth para armazenar trial_started_at
-   * Usa created_at da conta como fallback para contas antigas
+   * Verifica status do usuário na tabela user_subscriptions
    * 
-   * SEGURANÇA: Em caso de erro, retorna trial EXPIRADO (estado seguro)
+   * LÓGICA:
+   * 1. Busca registro do usuário na tabela
+   * 2. Se status = 'trialing' E trial_end > hoje -> trial ativo
+   * 3. Se status = 'active' -> assinatura ativa
+   * 4. Qualquer outro caso -> sem acesso
+   * 
+   * IMPORTANTE: Apenas CONSULTA, nunca cria/atualiza
    */
-  const checkTrialStatus = async (userId: string): Promise<{ 
-    isInTrial: boolean; 
+  const checkUserSubscription = async (userId: string): Promise<{
+    isActive: boolean;
+    isInTrial: boolean;
     trialEndsAt: Date | null;
-    daysRemaining: number;
-  }> => {
+    trialDaysRemaining: number;
+    planName: string | null;
+  } | null> => {
     try {
-      console.log('[checkTrialStatus] 🔍 Verificando trial para usuário:', userId);
+      console.log('[checkUserSubscription] 🔍 Consultando user_subscriptions para:', userId);
       
       // VALIDAÇÃO: Verificar se Supabase está pronto
       const guard = await checkSupabaseReady();
 
       if (!guard.isReady) {
-        console.log('[checkTrialStatus] ⚠️ Supabase não está pronto');
-        console.log('[checkTrialStatus] ❌ ESTADO SEGURO: Trial expirado');
-        return { isInTrial: false, trialEndsAt: null, daysRemaining: 0 };
-      }
-
-      const user = guard.user!;
-
-      console.log('[checkTrialStatus] 📋 User metadata completo:', JSON.stringify(user.user_metadata, null, 2));
-      console.log('[checkTrialStatus] 📅 Conta criada em:', user.created_at);
-
-      const accountCreatedAt = new Date(user.created_at);
-      const now = new Date();
-      
-      // Calcular idade da conta em dias
-      const accountAgeDays = Math.floor((now.getTime() - accountCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
-      console.log('[checkTrialStatus] 📊 Idade da conta:', accountAgeDays, 'dias');
-
-      // Verificar se trial_started_at existe no user_metadata
-      const trialStartedAtStr = user.user_metadata?.trial_started_at;
-      console.log('[checkTrialStatus] 📅 trial_started_at encontrado:', trialStartedAtStr);
-
-      // Se não tem trial_started_at, precisamos decidir o que fazer
-      if (!trialStartedAtStr) {
-        console.log('[checkTrialStatus] ⚠️ Sem trial_started_at registrado');
-        
-        // CORREÇÃO CRÍTICA: Verificar idade da conta
-        if (accountAgeDays > 3) {
-          // Conta antiga (mais de 3 dias) - trial já expirou
-          console.log('[checkTrialStatus] ❌ Conta antiga (', accountAgeDays, 'dias) - Trial expirado');
-          
-          // Registrar que o trial expirou (usar created_at como referência)
-          const trialEndsAt = new Date(accountCreatedAt);
-          trialEndsAt.setDate(trialEndsAt.getDate() + 3);
-          
-          // Opcionalmente, registrar no metadata para não recalcular sempre
-          try {
-            await supabase.auth.updateUser({
-              data: { trial_started_at: accountCreatedAt.toISOString() }
-            });
-          } catch (updateError) {
-            console.log('[checkTrialStatus] ⚠️ Erro ao atualizar metadata (não crítico)');
-          }
-          
-          return { 
-            isInTrial: false, 
-            trialEndsAt,
-            daysRemaining: 0
-          };
-        }
-        
-        // Conta nova (menos de 3 dias) - iniciar trial
-        console.log('[checkTrialStatus] 🎉 Conta nova - Iniciando trial de 3 dias...');
-        const trialStartedAt = accountCreatedAt; // Usar data de criação da conta
-        const nowISO = trialStartedAt.toISOString();
-        
-        console.log('[checkTrialStatus] ⏰ Trial iniciado em:', nowISO);
-        
-        // Registrar início do trial no user_metadata
-        try {
-          await supabase.auth.updateUser({
-            data: { trial_started_at: nowISO }
-          });
-          console.log('[checkTrialStatus] ✅ Trial registrado com sucesso!');
-        } catch (updateError) {
-          console.log('[checkTrialStatus] ⚠️ Erro ao registrar trial (não crítico)');
-        }
-
-        // Calcular data de término (3 dias a partir da criação da conta)
-        const trialEndsAt = new Date(trialStartedAt);
-        trialEndsAt.setDate(trialEndsAt.getDate() + 3);
-
-        // Calcular dias restantes
-        const diffTime = trialEndsAt.getTime() - now.getTime();
-        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const isInTrial = daysRemaining > 0;
-
-        console.log('[checkTrialStatus] ✅ Trial status:', {
-          startedAt: nowISO,
-          endsAt: trialEndsAt.toISOString(),
-          daysRemaining: Math.max(0, daysRemaining),
-          isInTrial
-        });
-
-        return { 
-          isInTrial, 
-          trialEndsAt,
-          daysRemaining: Math.max(0, daysRemaining)
-        };
-      }
-
-      // Trial já existe - verificar se ainda está ativo
-      console.log('[checkTrialStatus] 🔄 Trial já existe - verificando se ainda está ativo...');
-      const trialStartedAt = new Date(trialStartedAtStr);
-      const trialEndsAt = new Date(trialStartedAt);
-      trialEndsAt.setDate(trialEndsAt.getDate() + 3); // 3 dias de trial
-
-      const isInTrial = now < trialEndsAt;
-
-      // Calcular dias restantes
-      const diffTime = trialEndsAt.getTime() - now.getTime();
-      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      console.log('[checkTrialStatus] 📊 Status do trial:', {
-        trialStartedAt: trialStartedAt.toISOString(),
-        trialEndsAt: trialEndsAt.toISOString(),
-        now: now.toISOString(),
-        isInTrial,
-        daysRemaining: Math.max(0, daysRemaining)
-      });
-
-      return { 
-        isInTrial, 
-        trialEndsAt,
-        daysRemaining: Math.max(0, daysRemaining)
-      };
-    } catch (error) {
-      console.error('[checkTrialStatus] ❌ Erro inesperado:', error);
-      console.log('[checkTrialStatus] ❌ ESTADO SEGURO: Trial expirado');
-      // ESTADO SEGURO: Em caso de erro, considerar trial expirado
-      return { isInTrial: false, trialEndsAt: null, daysRemaining: 0 };
-    }
-  };
-
-  /**
-   * Verifica se usuário tem assinatura ativa no Supabase
-   * Consulta tabela user_subscriptions atualizada pelo webhook da Kirvano
-   * 
-   * SEGURANÇA: Em caso de erro, retorna NULL (sem assinatura - estado seguro)
-   */
-  const checkActiveSubscription = async (userId: string): Promise<{ planName: string } | null> => {
-    try {
-      console.log('[checkActiveSubscription] 🔍 Verificando assinatura para:', userId);
-      
-      // VALIDAÇÃO: Verificar se Supabase está pronto
-      const guard = await checkSupabaseReady();
-
-      if (!guard.isReady) {
-        console.log('[checkActiveSubscription] ⚠️ Supabase não está pronto');
-        console.log('[checkActiveSubscription] ❌ ESTADO SEGURO: Sem assinatura');
+        console.log('[checkUserSubscription] ⚠️ Supabase não está pronto');
+        console.log('[checkUserSubscription] ❌ ESTADO SEGURO: Sem acesso');
         return null;
       }
 
-      // Usar wrapper seguro para query
+      // Buscar registro do usuário (qualquer status)
       const { data: subscription, error } = await safeSupabaseQuery(
         supabase
           .from('user_subscriptions')
           .select('*')
           .eq('user_id', userId)
-          .eq('status', 'active')
           .single()
       );
 
       if (error) {
-        console.log('[checkActiveSubscription] ⚠️ Erro ao buscar assinatura:', error);
-        console.log('[checkActiveSubscription] ❌ ESTADO SEGURO: Sem assinatura');
+        console.log('[checkUserSubscription] ⚠️ Erro ao buscar registro:', error);
+        console.log('[checkUserSubscription] ❌ ESTADO SEGURO: Sem acesso');
         return null;
       }
 
       if (!subscription) {
-        console.log('[checkActiveSubscription] ❌ Nenhuma assinatura ativa encontrada');
+        console.log('[checkUserSubscription] ❌ Nenhum registro encontrado - usuário sem acesso');
         return null;
       }
 
-      console.log('[checkActiveSubscription] 📋 Assinatura encontrada:', subscription);
+      console.log('[checkUserSubscription] 📋 Registro encontrado:', {
+        status: subscription.status,
+        trial_end: subscription.trial_end,
+        plan_name: subscription.plan_name,
+      });
 
-      // Verificar se a assinatura ainda está válida (data de fim)
-      if (subscription.end_date) {
-        const endDate = new Date(subscription.end_date);
-        const now = new Date();
-        
-        if (now > endDate) {
-          // Assinatura expirada
-          console.log('[checkActiveSubscription] ⏰ Assinatura expirada em:', endDate.toISOString());
+      const now = new Date();
+
+      // CASO 1: Status = 'trialing' (período de teste)
+      if (subscription.status === 'trialing') {
+        if (!subscription.trial_end) {
+          console.log('[checkUserSubscription] ⚠️ Trial sem data de término - bloqueando');
           return null;
         }
+
+        const trialEndsAt = new Date(subscription.trial_end);
+        const isTrialActive = now < trialEndsAt;
+
+        if (!isTrialActive) {
+          console.log('[checkUserSubscription] ⏰ Trial expirado em:', trialEndsAt.toISOString());
+          return {
+            isActive: false,
+            isInTrial: false,
+            trialEndsAt,
+            trialDaysRemaining: 0,
+            planName: null,
+          };
+        }
+
+        // Trial ativo - calcular dias restantes
+        const diffTime = trialEndsAt.getTime() - now.getTime();
+        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        console.log('[checkUserSubscription] ✅ Trial ativo - ACESSO LIBERADO', {
+          trialEndsAt: trialEndsAt.toISOString(),
+          daysRemaining,
+        });
+
+        return {
+          isActive: true,
+          isInTrial: true,
+          trialEndsAt,
+          trialDaysRemaining: Math.max(0, daysRemaining),
+          planName: 'Trial Gratuito',
+        };
       }
 
-      console.log('[checkActiveSubscription] ✅ Assinatura ativa:', subscription.plan_name);
+      // CASO 2: Status = 'active' (assinatura ativa)
+      if (subscription.status === 'active') {
+        console.log('[checkUserSubscription] ✅ Assinatura ativa - ACESSO LIBERADO');
+        return {
+          isActive: true,
+          isInTrial: false,
+          trialEndsAt: null,
+          trialDaysRemaining: 0,
+          planName: subscription.plan_name || 'Premium',
+        };
+      }
+
+      // CASO 3: Qualquer outro status (canceled, expired, etc.)
+      console.log('[checkUserSubscription] ❌ Status não permite acesso:', subscription.status);
       return {
-        planName: subscription.plan_name || 'Premium',
+        isActive: false,
+        isInTrial: false,
+        trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end) : null,
+        trialDaysRemaining: 0,
+        planName: null,
       };
     } catch (error) {
-      console.error('[checkActiveSubscription] ❌ Erro inesperado:', error);
-      console.log('[checkActiveSubscription] ❌ ESTADO SEGURO: Sem assinatura');
-      // ESTADO SEGURO: Em caso de erro, considerar sem assinatura
+      console.error('[checkUserSubscription] ❌ Erro inesperado:', error);
+      console.log('[checkUserSubscription] ❌ ESTADO SEGURO: Sem acesso');
       return null;
     }
   };

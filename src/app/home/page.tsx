@@ -11,6 +11,7 @@ import { useLogDailyLogin } from '@/hooks/useLogDailyLogin';
 import WeekActivityStreak from '@/components/custom/WeekActivityStreak';
 import { useWeekStreak } from '@/hooks/useWeekStreak';
 import { useSubscription } from '@/hooks/useSubscription';
+import PrayerFloatingButton from '@/components/custom/PrayerFloatingButton';
 
 const mockContents: DailyContent[] = [
   {
@@ -83,7 +84,7 @@ const getTodayInBrazil = (): string => {
   });
   
   // Parsear a string no formato MM/DD/YYYY para YYYY-MM-DD
-  const [month, day, year] = brazilDateString.split(/[\/,\s]+/);
+  const [month, day, year] = brazilDateString.split(/[\\/,\\s]+/);
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
@@ -602,6 +603,9 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Botão Flutuante de Oração */}
+      <PrayerFloatingButton />
 
       {/* Sidebar */}
       <Sidebar 
