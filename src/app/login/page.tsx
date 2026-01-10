@@ -55,8 +55,11 @@ export default function LoginPage() {
           }
         }
 
-        // Redirecionar conforme resposta
-        window.location.href = data.redirectTo;
+        // CORREÇÃO: Usar router.push() ao invés de window.location.href
+        console.log('[LOGIN] 🔀 Redirecionando via router.push para:', data.redirectTo);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        router.push(data.redirectTo);
+        router.refresh();
       } else {
         console.warn('[LOGIN] ⚠️ Erro no login-callback, usando fallback');
         
@@ -72,17 +75,23 @@ export default function LoginPage() {
           const redirectTo = profileData.quizCompleted ? '/home' : '/onboarding';
           
           console.log('[LOGIN] 🔀 Redirecionando para:', redirectTo);
-          window.location.href = redirectTo;
+          await new Promise(resolve => setTimeout(resolve, 300));
+          router.push(redirectTo);
+          router.refresh();
         } else {
           // Se tudo falhar, ir para onboarding
           console.log('[LOGIN] ⚠️ Erro ao buscar perfil, indo para onboarding');
-          window.location.href = '/onboarding';
+          await new Promise(resolve => setTimeout(resolve, 300));
+          router.push('/onboarding');
+          router.refresh();
         }
       }
     } catch (error) {
       console.error('[LOGIN] ❌ Erro no login-callback:', error);
       // Em caso de erro, redirecionar para onboarding por segurança
-      window.location.href = '/onboarding';
+      await new Promise(resolve => setTimeout(resolve, 300));
+      router.push('/onboarding');
+      router.refresh();
     }
   };
 
@@ -117,9 +126,9 @@ export default function LoginPage() {
         console.log('[LOGIN] ✅ Sessão criada com sucesso!');
         console.log('[LOGIN] User ID:', data.session.user.id);
 
-        // Aguardar 1 segundo para garantir que cookies e localStorage estejam sincronizados
-        console.log('[LOGIN] Aguardando 1s para sincronização de cookies...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Aguardar para garantir que cookies e localStorage estejam sincronizados
+        console.log('[LOGIN] Aguardando sincronização de sessão...');
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         // Verificar se a sessão foi salva usando validação segura
         const guard = await checkSupabaseReady();

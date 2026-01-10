@@ -1,68 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Criar client do servidor com ANON KEY (não service role)
-// Isso garante que RLS será respeitado e apenas dados do usuário autenticado serão acessíveis
-function createServerClient(authToken?: string) {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Variáveis de ambiente do Supabase não configuradas');
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey, {
+// Criar client do servidor com service role para API routes
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-    },
-    global: {
-      headers: authToken ? {
-        Authorization: `Bearer ${authToken}`,
-      } : {},
-    },
-  });
-}
-
-// Extrair token do header Authorization
-function extractToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+    }
   }
-  return authHeader.substring(7); // Remove "Bearer "
-}
+);
 
-// GET - Buscar dados do usuário autenticado
+// GET - Buscar dados do usuário
 export async function GET(request: NextRequest) {
   try {
-    // Extrair token de autenticação
-    const token = extractToken(request);
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Token de autenticação não fornecido' },
-        { status: 401 }
-      );
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Criar client com token do usuário
-    const supabase = createServerClient(token);
-
-    // Validar usuário autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Token inválido ou expirado' },
-        { status: 401 }
-      );
-    }
-
-    // Usar o userId do usuário autenticado (NUNCA aceitar do cliente)
-    const userId = user.id;
-
-    // Buscar dados do usuário (RLS garante que só acessa seus próprios dados)
-    const { data: userData, error: userDataError } = await supabase
+    // Buscar dados do usuário
+    const { data: userData, error: userDataError } = await supabaseAdmin
       .from('user_data')
       .select('*')
       .eq('user_id', userId)
@@ -72,8 +34,8 @@ export async function GET(request: NextRequest) {
       throw userDataError;
     }
 
-    // Buscar histórico de acesso (RLS garante que só acessa seus próprios dados)
-    const { data: accessHistory, error: historyError } = await supabase
+    // Buscar histórico de acesso
+    const { data: accessHistory, error: historyError } = await supabaseAdmin
       .from('access_history')
       .select('*')
       .eq('user_id', userId)
@@ -93,47 +55,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Criar ou atualizar dados do usuário autenticado
+// POST - Criar ou atualizar dados do usuário
 export async function POST(request: NextRequest) {
   try {
-    // Extrair token de autenticação
-    const token = extractToken(request);
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Token de autenticação não fornecido' },
-        { status: 401 }
-      );
-    }
-
-    // Criar client com token do usuário
-    const supabase = createServerClient(token);
-
-    // Validar usuário autenticado
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Token inválido ou expirado' },
-        { status: 401 }
-      );
-    }
-
-    // Usar o userId do usuário autenticado (IGNORAR userId do body)
-    const userId = user.id;
-
     const body = await request.json();
-    const { consecutiveDays, lastAccessDate, onboardingCompleted, trialStartedAt } = body;
+    const { userId, consecutiveDays, lastAccessDate, onboardingCompleted, trialStartedAt } = body;
 
-    // Validar dados obrigatórios
-    if (consecutiveDays === undefined || !lastAccessDate) {
-      return NextResponse.json(
-        { error: 'Dados obrigatórios não fornecidos' },
-        { status: 400 }
-      );
+    if (!userId) {
+      return NextResponse.json({ error: 'userId é obrigatório' }, { status: 400 });
     }
 
-    // Verificar se já existe dados do usuário (RLS garante que só acessa seus próprios dados)
-    const { data: existingData } = await supabase
+    // Verificar se já existe dados do usuário
+    const { data: existingData } = await supabaseAdmin
       .from('user_data')
       .select('*')
       .eq('user_id', userId)
@@ -154,7 +87,7 @@ export async function POST(request: NextRequest) {
         updateData.trial_started_at = trialStartedAt;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('user_data')
         .update(updateData)
         .eq('user_id', userId)
@@ -177,7 +110,7 @@ export async function POST(request: NextRequest) {
         insertData.trial_started_at = trialStartedAt;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('user_data')
         .insert(insertData)
         .select()
