@@ -4,7 +4,7 @@
 console.log('🏠 [HOME] Arquivo page.tsx carregado!');
 
 import { useState, useEffect } from 'react';
-import { Menu, Bell, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star } from 'lucide-react';
+import { Menu, Bell, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star, Sun, Moon } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +17,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import PrayerFloatingButton from '@/components/custom/PrayerFloatingButton';
 import { checkOnboardingStatus } from '@/lib/onboarding-guard';
 import { loopGuard, getRedirectOrigin, buildRedirectUrl } from '@/lib/loop-guard';
+import { useTheme } from 'next-themes';
 
 const mockContents: DailyContent[] = [
   {
@@ -98,12 +99,13 @@ const createBrazilDate = (dateString: string): Date => {
 
 export default function HomePage() {
   const router = useRouter();
-  
+  const { theme, setTheme } = useTheme();
+
   useIncrementLoginOnce();
   useLogDailyLogin();
   const { streak } = useWeekStreak();
   const { isActive: hasAccess, isInTrial, loading: subscriptionLoading } = useSubscription();
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
@@ -359,29 +361,43 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-40">
+      <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40 transition-colors">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button
               onClick={() => openSidebarWithTab('account')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <Menu className="w-6 h-6 text-gray-700" />
+              <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
             </button>
-            
+
             <div className="flex items-center gap-2">
               <img src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/8f5542a7-c136-497a-822e-8e2a2fb72e5e.png" alt="Plano Diário" className="h-16 w-auto" />
             </div>
 
-            <button 
-              onClick={() => openSidebarWithTab('frequency')}
-              className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl p-3 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
-            >
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 animate-pulse" />
-                <p className="text-lg font-bold leading-none lasy-highlight">{streak}</p>
-              </div>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-2 hover:bg-amber-100 dark:hover:bg-amber-900 rounded-lg transition-all border border-amber-200 dark:border-amber-700"
+                title="Trocar tema"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <Moon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                )}
+              </button>
+
+              <button
+                onClick={() => openSidebarWithTab('frequency')}
+                className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl p-3 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
+              >
+                <div className="flex items-center gap-2">
+                  <Star className="w-5 h-5 animate-pulse" />
+                  <p className="text-lg font-bold leading-none lasy-highlight">{streak}</p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -445,16 +461,16 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Content Cards - SEM BOTÕES ✔️ E 🔗 */}
+        {/* Content Cards - Click direto no card */}
         <div className="space-y-4">
           {contents.map((content) => (
             <div
               key={content.id}
-              className="bg-white rounded-2xl shadow-md overflow-hidden transition-all hover:shadow-lg"
+              onClick={() => handleCardClick(content)}
+              className="bg-white rounded-2xl shadow-md overflow-hidden transition-all hover:shadow-lg cursor-pointer active:scale-98"
             >
               <div
-                onClick={() => handleCardClick(content)}
-                className="relative h-40 bg-cover bg-center cursor-pointer"
+                className="relative h-40 bg-cover bg-center"
                 style={{ backgroundImage: `url(${content.image})` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -472,31 +488,13 @@ export default function HomePage() {
 
               <div className="p-4">
                 {content.reflection && (
-                  <div className="bg-amber-50 rounded-lg p-3 mb-3">
+                  <div className="bg-amber-50 rounded-lg p-3">
                     <p className="text-sm text-gray-700 italic">{content.reflection}</p>
                   </div>
                 )}
 
-                {content.questions && expandedCard === content.id && (
-                  <div className="space-y-2 mb-3">
-                    <p className="text-sm font-semibold text-gray-800">Perguntas para conectar-se</p>
-                    {content.questions.map((question, idx) => (
-                      <div key={idx} className="flex gap-2">
-                        <span className="text-amber-500 font-semibold">{idx + 1}.</span>
-                        <p className="text-sm text-gray-700">{question}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {content.questions && (
-                  <button
-                    onClick={() => toggleExpand(content.id)}
-                    className="flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm font-semibold transition-colors"
-                  >
-                    {expandedCard === content.id ? 'Ver menos' : 'Ver perguntas de reflexão'}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${expandedCard === content.id ? 'rotate-180' : ''}`} />
-                  </button>
+                {content.content && !content.reflection && (
+                  <p className="text-sm text-gray-600">{content.content}</p>
                 )}
               </div>
             </div>

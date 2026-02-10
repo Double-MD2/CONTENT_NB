@@ -6,6 +6,7 @@ import "./globals.css";
 import "../lib/fonts";
 import FooterGate from "@/components/custom/FooterGate";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ThemeProvider } from "@/components/ui/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,14 +39,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SidebarProvider>
-          {children}
-          <FooterGate />
-        </SidebarProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SidebarProvider>
+            {children}
+            <FooterGate />
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
