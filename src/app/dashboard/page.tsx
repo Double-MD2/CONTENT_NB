@@ -33,6 +33,7 @@ const mockContents: DailyContent[] = [
     id: '2',
     type: 'verse',
     title: 'Versículo do Dia',
+    content: '',
     reflection: 'Versículos sobre o amor incondicional de Deus e com reflexões para internalizar no coração',
     duration: '3 min',
     image: 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=800&h=400&fit=crop',
