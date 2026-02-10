@@ -148,6 +148,11 @@ export default function BottomNav() {
     return null;
   }
 
+  // Ocultar o rodapé em TODAS as páginas de "Para Você"
+  if (safePathname.startsWith('/para-voce')) {
+    return null;
+  }
+
   /**
    * Verifica acesso premium antes de navegar
    * Bíblia e Favoritos são PREMIUM - requerem assinatura ativa

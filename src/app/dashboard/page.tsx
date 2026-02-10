@@ -4,7 +4,7 @@
 console.log('🏠 [HOME] Arquivo page.tsx carregado!');
 
 import { useState, useEffect } from 'react';
-import { Menu, Bell, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star, Sun, Moon } from 'lucide-react';
+import { Menu, Bell, Clock, ChevronDown, Home, BookOpen, Heart, User, Users, MessageCircle, ShoppingCart, Star, Sun, Moon, RefreshCw } from 'lucide-react';
 import { DailyContent } from '@/lib/types';
 import Sidebar from '@/components/custom/sidebar';
 import { supabase } from '@/lib/supabase';
@@ -123,10 +123,35 @@ export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [weeklyAccess, setWeeklyAccess] = useState<boolean[]>([false, false, false, false, false, false, false]);
+  const [canChangeTheme, setCanChangeTheme] = useState<boolean>(true);
+  const [daysRemaining, setDaysRemaining] = useState<number>(0);
+  const [showBlockedMessage, setShowBlockedMessage] = useState<boolean>(false);
 
   useEffect(() => {
     initializeUser();
+    checkThemeChangeAvailability();
   }, []);
+
+  const checkThemeChangeAvailability = () => {
+    const savedTheme = localStorage.getItem('forYouTheme');
+    if (!savedTheme) {
+      setCanChangeTheme(true);
+      return;
+    }
+
+    const themeData = JSON.parse(savedTheme);
+    const selectedAt = new Date(themeData.selectedAt);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - selectedAt.getTime()) / (1000 * 60 * 60 * 24));
+    const canChange = daysDiff >= 7;
+
+    setCanChangeTheme(canChange);
+
+    if (!canChange) {
+      const remaining = 7 - daysDiff;
+      setDaysRemaining(remaining);
+    }
+  };
 
   const initializeUser = async () => {
     try {
@@ -389,6 +414,25 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
+  const handleChangeTheme = () => {
+    // Verificar se tem tema configurado primeiro
+    const savedTheme = localStorage.getItem('forYouTheme');
+    if (!savedTheme) {
+      // Se não tem tema, vai direto para seleção
+      router.push('/para-voce/temas');
+      return;
+    }
+
+    // Se tem tema, verificar se pode trocar
+    if (!canChangeTheme) {
+      setShowBlockedMessage(true);
+      return;
+    }
+
+    // Se pode trocar, vai para seleção de tema
+    router.push('/para-voce/temas');
+  };
+
   if (loading || subscriptionLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
@@ -546,10 +590,24 @@ export default function HomePage() {
                   <p className="text-sm text-gray-600">{content.content}</p>
                 )}
 
-                {/* Botão "Escolher tema" para card "Para Você" sem tema */}
+                {/* Botão "Escolher tema" ou "Trocar tema" para card "Para Você" */}
                 {content.type === 'for-you' && !content.theme && (
                   <button className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg transition-colors">
                     Escolher tema
+                  </button>
+                )}
+
+                {/* Botão "Trocar tema" quando já tem tema configurado */}
+                {content.type === 'for-you' && content.theme && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleChangeTheme();
+                    }}
+                    className="mt-3 flex items-center justify-center gap-2 w-full border-2 border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold py-2 rounded-lg transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Trocar tema</span>
                   </button>
                 )}
               </div>
@@ -560,11 +618,40 @@ export default function HomePage() {
 
       <PrayerFloatingButton />
 
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         initialTab={sidebarInitialTab}
       />
+
+      {/* Modal de Bloqueio (quando NÃO pode trocar tema) */}
+      {showBlockedMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <RefreshCw className="w-8 h-8 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Você já trocou de tema recentemente
+              </h3>
+            </div>
+            <p className="text-gray-600 text-center mb-6">
+              Você poderá trocar de tema novamente em{' '}
+              <span className="font-bold text-amber-600">
+                {daysRemaining} {daysRemaining === 1 ? 'dia' : 'dias'}
+              </span>
+              .
+            </p>
+            <button
+              onClick={() => setShowBlockedMessage(false)}
+              className="w-full py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
