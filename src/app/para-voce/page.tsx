@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BookOpen, Heart, Lightbulb, Check } from 'lucide-react';
+import { ArrowLeft, BookOpen, Heart, Lightbulb, Check, RefreshCw } from 'lucide-react';
 import { getForYouDailyContent, type ForYouContent } from '@/lib/for-you-content';
 
 export default function ForYouPage() {
@@ -116,12 +116,13 @@ export default function ForYouPage() {
           <p className="text-gray-700 leading-relaxed">{content.action}</p>
         </div>
 
-        {/* Botão Trocar Tema */}
+        {/* Botão Trocar Tema - Design melhorado */}
         <button
           onClick={handleChangeTheme}
-          className="text-sm text-gray-500 hover:text-amber-600 underline mt-4"
+          className="mt-6 flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-all shadow-sm"
         >
-          Trocar tema
+          <RefreshCw className="w-4 h-4" />
+          <span className="text-sm font-medium">Trocar tema</span>
         </button>
       </div>
 
