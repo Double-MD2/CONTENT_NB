@@ -553,7 +553,7 @@ export default function HomePage() {
             <div
               key={content.id}
               onClick={() => handleCardClick(content)}
-              className="bg-white rounded-2xl shadow-md overflow-hidden transition-all hover:shadow-lg cursor-pointer active:scale-98"
+              className="bg-white rounded-2xl shadow-md overflow-hidden transition-all hover:shadow-lg cursor-pointer active:scale-98 relative"
             >
               <div
                 className="relative h-40 bg-cover bg-center"
@@ -590,27 +590,27 @@ export default function HomePage() {
                   <p className="text-sm text-gray-600">{content.content}</p>
                 )}
 
-                {/* Botão "Escolher tema" ou "Trocar tema" para card "Para Você" */}
+                {/* Botão "Escolher tema" - só quando NÃO tem tema */}
                 {content.type === 'for-you' && !content.theme && (
                   <button className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg transition-colors">
                     Escolher tema
                   </button>
                 )}
-
-                {/* Botão "Trocar tema" quando já tem tema configurado */}
-                {content.type === 'for-you' && content.theme && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleChangeTheme();
-                    }}
-                    className="mt-3 flex items-center justify-center gap-2 w-full border-2 border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold py-2 rounded-lg transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Trocar tema</span>
-                  </button>
-                )}
               </div>
+
+              {/* Botão "Trocar tema" - posicionado no canto inferior esquerdo (fora do conteúdo) */}
+              {content.type === 'for-you' && content.theme && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleChangeTheme();
+                  }}
+                  className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm border border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-all shadow-sm text-xs font-medium z-10"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Trocar tema</span>
+                </button>
+              )}
             </div>
           ))}
         </div>
