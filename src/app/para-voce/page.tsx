@@ -95,7 +95,7 @@ export default function ForYouPage() {
       {/* Content */}
       <div className="container mx-auto px-4 py-6">
         {/* Card principal com conteúdo */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-4 relative">
+        <div className="bg-white rounded-2xl shadow-lg p-6 pb-16 mb-4 relative">
           {/* Texto Bíblico */}
           <div className="mb-6 border-l-4 border-amber-500 pl-4">
             <div className="flex items-center gap-2 mb-3">
@@ -125,7 +125,7 @@ export default function ForYouPage() {
           </div>
 
           {/* Ação Prática */}
-          <div className="mb-12 border-l-4 border-green-500 pl-4">
+          <div className="mb-6 border-l-4 border-green-500 pl-4">
             <div className="flex items-center gap-2 mb-3">
               <Check className="w-5 h-5 text-green-600" />
               <h2 className="text-lg font-bold text-gray-900">Ação Prática</h2>
@@ -134,10 +134,10 @@ export default function ForYouPage() {
           </div>
 
           {/* Botão Trocar Tema - Posicionado no canto inferior esquerdo */}
-          <div className="absolute bottom-4 left-4">
+          <div className="absolute bottom-4 left-4 z-10">
             <button
               onClick={handleChangeTheme}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-all shadow-sm text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-500 transition-all shadow-md text-sm font-semibold"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Trocar tema</span>
