@@ -572,7 +572,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="p-4">
+              <div className={`p-4 ${content.type === 'for-you' && content.theme ? 'pb-12' : ''}`}>
                 {/* Card "Para Você" - Mostrar tema se configurado */}
                 {content.type === 'for-you' && content.theme && (
                   <div className="mb-3">
