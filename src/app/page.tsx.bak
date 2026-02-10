@@ -1,0 +1,91 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { isValidSession } from '@/lib/auth-helpers';
+
+export default function Home() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkUser = async () => {
+      try {
+        console.log('[ROOT] 🔍 Verificando autenticação...');
+
+        // Tentar múltiplas vezes com delay (sessão pode demorar pra carregar)
+        let session = null;
+        let retries = 0;
+        const maxRetries = 3;
+
+        while (retries < maxRetries) {
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+
+          console.log(`[ROOT] Tentativa ${retries + 1}/${maxRetries}:`, {
+            hasSession: !!currentSession,
+            hasUser: !!currentSession?.user,
+            userId: currentSession?.user?.id,
+            email: currentSession?.user?.email,
+            error: sessionError?.message,
+          });
+
+          // CRÍTICO: Usar validação robusta da sessão
+          if (isValidSession(currentSession)) {
+            session = currentSession;
+            break;
+          }
+
+          // Aguardar antes de tentar novamente
+          retries++;
+          if (retries < maxRetries) {
+            console.log(`[ROOT] ⏳ Aguardando 800ms antes de retry ${retries + 1}...`);
+            await new Promise(resolve => setTimeout(resolve, 800));
+          }
+        }
+
+        if (!isMounted) return;
+
+        // CRÍTICO: Usar validação robusta final
+        if (isValidSession(session)) {
+          console.log('[ROOT] ✅ Usuário autenticado com ID:', session!.user.id);
+          router.replace('/dashboard');
+        } else {
+          console.log('[ROOT] ❌ Nenhuma sessão válida encontrada - redirecionando para /login');
+          router.replace('/login');
+        }
+      } catch (error) {
+        console.error('[ROOT] ❌ Erro ao verificar sessão:', error);
+        if (isMounted) {
+          router.replace('/login');
+        }
+      } finally {
+        if (isMounted) {
+          setIsChecking(false);
+        }
+      }
+    };
+
+    checkUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  // Mostrar spinner ENQUANTO está checando
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
