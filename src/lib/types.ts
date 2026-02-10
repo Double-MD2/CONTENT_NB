@@ -27,7 +27,7 @@ export interface UserProfile {
 
 export interface DailyContent {
   id: string;
-  type: 'lectionary' | 'verse' | 'devotional' | 'prayer' | 'gratitude';
+  type: 'lectionary' | 'verse' | 'devotional' | 'prayer' | 'gratitude' | 'for-you';
   title: string;
   content: string;
   reflection?: string;
@@ -35,6 +35,7 @@ export interface DailyContent {
   duration: string;
   image: string;
   completed: boolean;
+  theme?: string; // Para o card "Para Você"
 }
 
 export interface FrequencyData {

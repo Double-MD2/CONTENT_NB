@@ -21,6 +21,15 @@ import { useTheme } from 'next-themes';
 
 const mockContents: DailyContent[] = [
   {
+    id: '0',
+    type: 'for-you',
+    title: 'Para Você',
+    content: 'Escolha um tema para receber conteúdos feitos para o seu momento.',
+    duration: '10 min',
+    image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=800&h=400&fit=crop',
+    completed: false,
+  },
+  {
     id: '1',
     type: 'lectionary',
     title: 'Leitura do Dia',
@@ -206,10 +215,32 @@ export default function HomePage() {
         console.warn('⚠️ Erro ao buscar dados do usuário:', apiError);
       }
 
+      // Atualizar card "Para Você" com tema configurado
+      const savedTheme = localStorage.getItem('forYouTheme');
+      const updatedMockContents = mockContents.map((content) => {
+        if (content.id === '0' && content.type === 'for-you' && savedTheme) {
+          const themeData = JSON.parse(savedTheme);
+          return {
+            ...content,
+            content: `Conteúdo espiritual personalizado para você`,
+            theme: themeData.name,
+          };
+        }
+        return content;
+      });
+
       const saved = localStorage.getItem('dailyContents');
       if (saved) {
         const savedContents = JSON.parse(saved);
         const updatedContents = savedContents.map((content: DailyContent) => {
+          if (content.id === '0' && content.type === 'for-you' && savedTheme) {
+            const themeData = JSON.parse(savedTheme);
+            return {
+              ...content,
+              content: `Conteúdo espiritual personalizado para você`,
+              theme: themeData.name,
+            };
+          }
           if (content.id === '1' && content.type === 'lectionary') {
             return { ...content, content: 'Leituras diárias conforme o Calendário Romano Geral (API CNBB)' };
           }
@@ -223,6 +254,8 @@ export default function HomePage() {
         });
         setContents(updatedContents);
         localStorage.setItem('dailyContents', JSON.stringify(updatedContents));
+      } else {
+        setContents(updatedMockContents);
       }
 
       setLoading(false);
@@ -322,7 +355,15 @@ export default function HomePage() {
       return;
     }
 
-    if (content.type === 'gratitude') {
+    if (content.type === 'for-you') {
+      // Verificar se já tem tema configurado
+      const savedTheme = localStorage.getItem('forYouTheme');
+      if (savedTheme) {
+        window.location.href = '/para-voce';
+      } else {
+        window.location.href = '/para-voce/temas';
+      }
+    } else if (content.type === 'gratitude') {
       window.location.href = '/gratitude';
     } else if (content.type === 'lectionary') {
       window.location.href = '/leitura-do-dia';
@@ -488,6 +529,13 @@ export default function HomePage() {
               </div>
 
               <div className="p-4">
+                {/* Card "Para Você" - Mostrar tema se configurado */}
+                {content.type === 'for-you' && content.theme && (
+                  <div className="mb-3">
+                    <p className="text-xs text-amber-600 font-semibold">Tema atual: {content.theme}</p>
+                  </div>
+                )}
+
                 {content.reflection && (
                   <div className="bg-amber-50 rounded-lg p-3">
                     <p className="text-sm text-gray-700 italic">{content.reflection}</p>
@@ -496,6 +544,13 @@ export default function HomePage() {
 
                 {content.content && !content.reflection && (
                   <p className="text-sm text-gray-600">{content.content}</p>
+                )}
+
+                {/* Botão "Escolher tema" para card "Para Você" sem tema */}
+                {content.type === 'for-you' && !content.theme && (
+                  <button className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg transition-colors">
+                    Escolher tema
+                  </button>
                 )}
               </div>
             </div>
