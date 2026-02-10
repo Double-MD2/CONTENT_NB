@@ -9,61 +9,61 @@ const THEMES = [
     id: 'luto-perda',
     name: 'Luto e Perda',
     description: 'Conforto e esperança em momentos de perda',
-    color: 'from-slate-500 to-slate-700',
+    emoji: '🕊️',
   },
   {
     id: 'ansiedade-medo',
     name: 'Ansiedade e Medo',
     description: 'Paz e tranquilidade para o coração inquieto',
-    color: 'from-blue-500 to-blue-700',
+    emoji: '🌊',
   },
   {
     id: 'fortalecimento-fe',
     name: 'Fortalecimento da Fé',
     description: 'Crescer e amadurecer na jornada espiritual',
-    color: 'from-purple-500 to-purple-700',
+    emoji: '⛰️',
   },
   {
     id: 'gratidao-alegria',
     name: 'Gratidão e Alegria',
     description: 'Celebrar as bênçãos e cultivar a alegria',
-    color: 'from-yellow-500 to-yellow-700',
+    emoji: '☀️',
   },
   {
     id: 'financeiro-trabalho',
     name: 'Financeiro e Trabalho',
     description: 'Sabedoria e provisão nas questões materiais',
-    color: 'from-green-500 to-green-700',
+    emoji: '💼',
   },
   {
     id: 'relacionamentos-familia',
     name: 'Relacionamentos e Família',
     description: 'Harmonia e amor nos relacionamentos',
-    color: 'from-pink-500 to-pink-700',
+    emoji: '👨‍👩‍👧‍👦',
   },
   {
     id: 'perdao-cura',
     name: 'Perdão e Cura Interior',
     description: 'Libertação e restauração do coração',
-    color: 'from-teal-500 to-teal-700',
+    emoji: '🌱',
   },
   {
     id: 'decisoes-dificeis',
     name: 'Decisões Difíceis',
     description: 'Discernimento e direção divina',
-    color: 'from-orange-500 to-orange-700',
+    emoji: '🧭',
   },
   {
     id: 'proposito-vocacao',
     name: 'Propósito e Vocação',
     description: 'Descobrir e cumprir seu chamado',
-    color: 'from-indigo-500 to-indigo-700',
+    emoji: '🎯',
   },
   {
     id: 'paz-interior',
     name: 'Paz Interior e Descanso',
     description: 'Renovação e descanso para a alma',
-    color: 'from-cyan-500 to-cyan-700',
+    emoji: '🌙',
   },
 ];
 
@@ -123,20 +123,23 @@ export default function ThemeSelectionPage() {
             <button
               key={theme.id}
               onClick={() => setSelectedTheme(theme.id)}
-              className={`w-full p-4 rounded-2xl transition-all ${
+              className={`w-full rounded-2xl transition-all bg-white ${
                 selectedTheme === theme.id
                   ? 'ring-4 ring-amber-400 shadow-lg'
                   : 'shadow-md hover:shadow-lg'
               }`}
             >
-              <div className={`bg-gradient-to-br ${theme.color} rounded-xl p-4 text-white relative`}>
+              <div className="p-4 relative flex items-center gap-4">
                 {selectedTheme === theme.id && (
-                  <div className="absolute top-3 right-3 bg-white rounded-full p-1">
-                    <Check className="w-5 h-5 text-amber-500" />
+                  <div className="absolute top-3 right-3 bg-amber-500 rounded-full p-1">
+                    <Check className="w-4 h-4 text-white" />
                   </div>
                 )}
-                <h3 className="text-lg font-bold mb-1">{theme.name}</h3>
-                <p className="text-sm text-white/90">{theme.description}</p>
+                <div className="text-4xl">{theme.emoji}</div>
+                <div className="flex-1 text-left">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">{theme.name}</h3>
+                  <p className="text-sm text-gray-600">{theme.description}</p>
+                </div>
               </div>
             </button>
           ))}
