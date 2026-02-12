@@ -18,6 +18,7 @@ import PrayerFloatingButton from '@/components/custom/PrayerFloatingButton';
 import { checkOnboardingStatus } from '@/lib/onboarding-guard';
 import { loopGuard, getRedirectOrigin, buildRedirectUrl } from '@/lib/loop-guard';
 import { useTheme } from 'next-themes';
+import { getUserSpiritualJourney, canChangeTheme as checkCanChangeTheme, getThemeInfo } from '@/lib/spiritual-journey';
 
 const mockContents: DailyContent[] = [
   {
@@ -126,32 +127,11 @@ export default function HomePage() {
   const [canChangeTheme, setCanChangeTheme] = useState<boolean>(true);
   const [daysRemaining, setDaysRemaining] = useState<number>(0);
   const [showBlockedMessage, setShowBlockedMessage] = useState<boolean>(false);
+  const [currentThemeName, setCurrentThemeName] = useState<string>('');
 
   useEffect(() => {
     initializeUser();
-    checkThemeChangeAvailability();
   }, []);
-
-  const checkThemeChangeAvailability = () => {
-    const savedTheme = localStorage.getItem('forYouTheme');
-    if (!savedTheme) {
-      setCanChangeTheme(true);
-      return;
-    }
-
-    const themeData = JSON.parse(savedTheme);
-    const selectedAt = new Date(themeData.selectedAt);
-    const now = new Date();
-    const daysDiff = Math.floor((now.getTime() - selectedAt.getTime()) / (1000 * 60 * 60 * 24));
-    const canChange = daysDiff >= 7;
-
-    setCanChangeTheme(canChange);
-
-    if (!canChange) {
-      const remaining = 7 - daysDiff;
-      setDaysRemaining(remaining);
-    }
-  };
 
   const initializeUser = async () => {
     try {
@@ -240,15 +220,30 @@ export default function HomePage() {
         console.warn('⚠️ Erro ao buscar dados do usuário:', apiError);
       }
 
-      // Atualizar card "Para Você" com tema configurado
-      const savedTheme = localStorage.getItem('forYouTheme');
+      // Buscar jornada espiritual do Supabase
+      const journey = await getUserSpiritualJourney(currentUserId);
+
+      // Verificar se pode trocar de tema
+      if (journey) {
+        const changeStatus = checkCanChangeTheme(journey);
+        setCanChangeTheme(changeStatus.allowed);
+        setDaysRemaining(changeStatus.daysRemaining);
+
+        // Buscar informações do tema
+        const themeInfo = getThemeInfo(journey.current_theme);
+        if (themeInfo) {
+          setCurrentThemeName(themeInfo.name);
+        }
+      }
+
+      // Atualizar card "Para Você" com tema configurado do Supabase
       const updatedMockContents = mockContents.map((content) => {
-        if (content.id === '0' && content.type === 'for-you' && savedTheme) {
-          const themeData = JSON.parse(savedTheme);
+        if (content.id === '0' && content.type === 'for-you' && journey) {
+          const themeInfo = getThemeInfo(journey.current_theme);
           return {
             ...content,
             content: `Conteúdo espiritual personalizado para você`,
-            theme: themeData.name,
+            theme: themeInfo?.name || journey.current_theme,
           };
         }
         return content;
@@ -258,12 +253,12 @@ export default function HomePage() {
       if (saved) {
         const savedContents = JSON.parse(saved);
         const updatedContents = savedContents.map((content: DailyContent) => {
-          if (content.id === '0' && content.type === 'for-you' && savedTheme) {
-            const themeData = JSON.parse(savedTheme);
+          if (content.id === '0' && content.type === 'for-you' && journey) {
+            const themeInfo = getThemeInfo(journey.current_theme);
             return {
               ...content,
               content: `Conteúdo espiritual personalizado para você`,
-              theme: themeData.name,
+              theme: themeInfo?.name || journey.current_theme,
             };
           }
           if (content.id === '1' && content.type === 'lectionary') {
@@ -374,17 +369,21 @@ export default function HomePage() {
     setExpandedCard(expandedCard === id ? null : id);
   };
 
-  const handleCardClick = (content: DailyContent) => {
+  const handleCardClick = async (content: DailyContent) => {
     if (!hasAccess) {
       router.push('/plans');
       return;
     }
 
     if (content.type === 'for-you') {
-      // Verificar se já tem tema configurado
-      const savedTheme = localStorage.getItem('forYouTheme');
-      if (savedTheme) {
-        window.location.href = '/para-voce';
+      // Verificar se já tem jornada no Supabase
+      if (userId) {
+        const journey = await getUserSpiritualJourney(userId);
+        if (journey) {
+          window.location.href = '/para-voce';
+        } else {
+          window.location.href = '/para-voce/temas';
+        }
       } else {
         window.location.href = '/para-voce/temas';
       }
@@ -414,16 +413,19 @@ export default function HomePage() {
     setSidebarOpen(true);
   };
 
-  const handleChangeTheme = () => {
-    // Verificar se tem tema configurado primeiro
-    const savedTheme = localStorage.getItem('forYouTheme');
-    if (!savedTheme) {
-      // Se não tem tema, vai direto para seleção
+  const handleChangeTheme = async () => {
+    if (!userId) return;
+
+    // Verificar se tem jornada no Supabase
+    const journey = await getUserSpiritualJourney(userId);
+
+    if (!journey) {
+      // Se não tem jornada, vai direto para seleção
       router.push('/para-voce/temas');
       return;
     }
 
-    // Se tem tema, verificar se pode trocar
+    // Se tem jornada, verificar se pode trocar (regra de 7 dias)
     if (!canChangeTheme) {
       setShowBlockedMessage(true);
       return;

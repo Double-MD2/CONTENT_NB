@@ -80,3 +80,30 @@ export interface AccessHistory {
   accessed: boolean;
   created_at: string;
 }
+
+// Tipos para "Para Você" - Jornada Espiritual
+export interface UserSpiritualJourney {
+  id: string;
+  user_id: string;
+  current_theme: string;
+  theme_selected_at: string;
+  last_theme_change_at: string | null;
+  last_content_date: string | null;
+  daily_content_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpiritualContent {
+  id: string;
+  theme: string;
+  day_index: number;
+  bible_text: {
+    reference: string;
+    text: string;
+  };
+  reflection: string;
+  prayer: string;
+  action: string;
+  created_at: string;
+}
