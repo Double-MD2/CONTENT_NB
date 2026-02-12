@@ -223,6 +223,31 @@ export async function getDailyContent(userId: string): Promise<SpiritualContent 
       .eq('day_index', currentIndex)
       .single();
 
+    // DEBUG: Validar se bible_text está vindo corretamente
+    if (data) {
+      console.log('[SPIRITUAL-JOURNEY] 📖 Conteúdo recebido do Supabase:');
+      console.log('- ID:', data.id);
+      console.log('- Tema:', data.theme);
+      console.log('- Day Index:', data.day_index);
+      console.log('- bible_text (RAW):', data.bible_text);
+      console.log('- bible_text type:', typeof data.bible_text);
+      console.log('- bible_text é string?', typeof data.bible_text === 'string');
+      console.log('- bible_text é objeto?', typeof data.bible_text === 'object');
+      console.log('- Todas as chaves do data:', Object.keys(data));
+
+      // Se for string, tentar parsear
+      if (typeof data.bible_text === 'string') {
+        console.log('⚠️ bible_text veio como STRING - tentando parsear...');
+        try {
+          const parsed = JSON.parse(data.bible_text);
+          console.log('✅ Parse bem-sucedido:', parsed);
+          data.bible_text = parsed; // Converter para objeto
+        } catch (e) {
+          console.error('❌ Erro ao parsear bible_text:', e);
+        }
+      }
+    }
+
     if (error) {
       // Se não encontrou conteúdo para este índice, voltar ao início (dia 0)
       if (error.code === 'PGRST116') {

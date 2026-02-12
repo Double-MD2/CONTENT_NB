@@ -121,9 +121,11 @@ export default function ForYouPage() {
             <h2 className="text-lg font-bold text-gray-900">Texto Bíblico</h2>
           </div>
           <p className="text-sm font-semibold text-amber-700 mb-2">
-            {content.bible_text.reference}
+            {content.bible_text?.reference || 'Referência não disponível'}
           </p>
-          <p className="text-gray-700 italic leading-relaxed">{content.bible_text.text}</p>
+          <p className="text-gray-700 italic leading-relaxed">
+            {content.bible_text?.text || 'Texto não disponível'}
+          </p>
         </div>
 
         {/* Reflexão */}
