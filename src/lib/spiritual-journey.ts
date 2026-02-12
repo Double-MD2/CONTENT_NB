@@ -38,32 +38,64 @@ export async function createSpiritualJourney(
   theme: string
 ): Promise<UserSpiritualJourney | null> {
   try {
+    console.log('[SPIRITUAL-JOURNEY] 🔍 Iniciando criação de jornada...');
+    console.log('[SPIRITUAL-JOURNEY] userId recebido:', userId);
+    console.log('[SPIRITUAL-JOURNEY] theme recebido:', theme);
+
+    // CRÍTICO: Validar autenticação antes de qualquer operação
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('[SPIRITUAL-JOURNEY] ❌ Erro de autenticação:', authError);
+      return null;
+    }
+
+    if (!user) {
+      console.error('[SPIRITUAL-JOURNEY] ❌ Usuário não autenticado');
+      return null;
+    }
+
+    console.log('[SPIRITUAL-JOURNEY] ✅ Usuário autenticado:', user.id);
+
+    // Validar se o userId recebido corresponde ao usuário autenticado
+    if (user.id !== userId) {
+      console.error('[SPIRITUAL-JOURNEY] ❌ userId não corresponde ao usuário autenticado');
+      return null;
+    }
+
     const now = new Date().toISOString();
+
+    const insertData = {
+      user_id: user.id, // USAR user.id diretamente (garantido pela autenticação)
+      current_theme: theme,
+      theme_selected_at: now,
+      last_theme_change_at: null,
+      last_content_date: null,
+      daily_content_index: 0,
+      created_at: now,
+      updated_at: now,
+    };
+
+    console.log('[SPIRITUAL-JOURNEY] 📤 Dados a serem inseridos:', insertData);
 
     const { data, error } = await supabase
       .from('user_spiritual_journey')
-      .insert({
-        user_id: userId,
-        current_theme: theme,
-        theme_selected_at: now,
-        last_theme_change_at: null,
-        last_content_date: null,
-        daily_content_index: 0,
-        created_at: now,
-        updated_at: now,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
-      console.error('[SPIRITUAL-JOURNEY] Erro ao criar jornada:', error);
+      console.error('[SPIRITUAL-JOURNEY] ❌ Erro ao criar jornada:', error);
+      console.error('[SPIRITUAL-JOURNEY] ❌ Código do erro:', error.code);
+      console.error('[SPIRITUAL-JOURNEY] ❌ Detalhes:', error.details);
+      console.error('[SPIRITUAL-JOURNEY] ❌ Mensagem:', error.message);
       return null;
     }
 
     console.log('[SPIRITUAL-JOURNEY] ✅ Jornada criada com sucesso:', data);
     return data;
   } catch (error) {
-    console.error('[SPIRITUAL-JOURNEY] Erro inesperado ao criar:', error);
+    console.error('[SPIRITUAL-JOURNEY] ❌ Erro inesperado ao criar:', error);
     return null;
   }
 }

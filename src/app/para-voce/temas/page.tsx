@@ -24,38 +24,72 @@ export default function ThemeSelectionPage() {
 
   const checkUser = async () => {
     try {
+      console.log('[THEME-SELECTION] 🔍 Verificando autenticação...');
+
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (authError) {
+        console.error('[THEME-SELECTION] ❌ Erro de autenticação:', authError);
+        alert('Erro ao verificar autenticação. Faça login novamente.');
         router.push('/login');
         return;
       }
 
+      if (!user) {
+        console.error('[THEME-SELECTION] ❌ Usuário não autenticado');
+        alert('Você precisa estar logado para acessar esta página.');
+        router.push('/login');
+        return;
+      }
+
+      console.log('[THEME-SELECTION] ✅ Usuário autenticado:', user.id);
+      console.log('[THEME-SELECTION] Email:', user.email);
       setUserId(user.id);
 
       // Verificar se já tem jornada (está trocando tema)
       const journey = await getUserSpiritualJourney(user.id);
       if (journey) {
+        console.log('[THEME-SELECTION] ✅ Jornada existente encontrada');
         setIsChangingTheme(true);
+      } else {
+        console.log('[THEME-SELECTION] ℹ️ Primeira seleção de tema');
       }
     } catch (error) {
-      console.error('[THEME-SELECTION] Erro ao verificar usuário:', error);
+      console.error('[THEME-SELECTION] ❌ Erro inesperado ao verificar usuário:', error);
+      alert('Erro inesperado. Tente novamente.');
     }
   };
 
   const handleConfirm = async () => {
-    if (!selectedTheme || !userId) return;
+    if (!selectedTheme) {
+      alert('Por favor, selecione um tema.');
+      return;
+    }
+
+    if (!userId) {
+      alert('Erro: usuário não identificado. Faça login novamente.');
+      router.push('/login');
+      return;
+    }
 
     setLoading(true);
 
     try {
+      console.log('[THEME-SELECTION] 📤 Confirmando seleção de tema...');
+      console.log('[THEME-SELECTION] Tema selecionado:', selectedTheme);
+      console.log('[THEME-SELECTION] userId:', userId);
+      console.log('[THEME-SELECTION] isChangingTheme:', isChangingTheme);
+
       if (isChangingTheme) {
         // Trocar tema existente
+        console.log('[THEME-SELECTION] 🔄 Trocando tema existente...');
         const result = await changeTheme(userId, selectedTheme);
 
         if (!result.success) {
+          console.error('[THEME-SELECTION] ❌ Falha ao trocar tema:', result.message);
           alert(result.message);
           setLoading(false);
           return;
@@ -64,10 +98,12 @@ export default function ThemeSelectionPage() {
         console.log('[THEME-SELECTION] ✅ Tema trocado com sucesso');
       } else {
         // Criar nova jornada
+        console.log('[THEME-SELECTION] 🆕 Criando nova jornada...');
         const journey = await createSpiritualJourney(userId, selectedTheme);
 
         if (!journey) {
-          alert('Erro ao criar jornada espiritual. Tente novamente.');
+          console.error('[THEME-SELECTION] ❌ Falha ao criar jornada');
+          alert('Erro ao criar jornada espiritual. Verifique o console para mais detalhes e tente novamente.');
           setLoading(false);
           return;
         }
@@ -76,10 +112,11 @@ export default function ThemeSelectionPage() {
       }
 
       // Redirecionar para dashboard
+      console.log('[THEME-SELECTION] ➡️ Redirecionando para dashboard...');
       router.push('/dashboard');
     } catch (error) {
-      console.error('[THEME-SELECTION] Erro ao confirmar tema:', error);
-      alert('Erro ao processar sua escolha. Tente novamente.');
+      console.error('[THEME-SELECTION] ❌ Erro inesperado ao confirmar tema:', error);
+      alert('Erro inesperado ao processar sua escolha. Verifique o console e tente novamente.');
       setLoading(false);
     }
   };
