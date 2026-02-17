@@ -50,7 +50,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SidebarProvider>
-            {children}
+            {/* Container centralizador global */}
+            <div className="w-full max-w-[480px] mx-auto px-4">
+              {children}
+            </div>
             <FooterGate />
           </SidebarProvider>
         </ThemeProvider>
