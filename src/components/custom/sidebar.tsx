@@ -445,7 +445,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
     if (!canRedeem) return;
 
     const message = encodeURIComponent(
-      `Olá! Atingi 10 conversões válidas no sistema "Indique a Palavra" do app Notas-Bíblicas e gostaria de resgatar minha recompensa de R$90.\n\nMeu código de indicação: ${referralCode}`
+      `Olá! Atingi 10 conversões válidas no sistema "Indique a Palavra" do app Notas-Bíblicas e gostaria de resgatar minha recompensa de R$20.\n\nMeu código de indicação: ${referralCode}`
     );
 
     const whatsappUrl = `https://wa.me/5564992016685?text=${message}`;
@@ -875,7 +875,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                   <DollarSign className="w-7 h-7 text-green-700" />
                 </div>
                 <p className="text-sm font-semibold text-gray-800 mb-1">Recompensa</p>
-                <p className="text-3xl font-bold text-green-700 mb-2">R$ 90,00</p>
+                <p className="text-3xl font-bold text-green-700 mb-2">R$ 20,00</p>
                 <p className="text-xs text-gray-600">Pago via Pix ao atingir 10 conversões válidas</p>
               </div>
 
@@ -899,7 +899,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
               {/* Informação Adicional */}
               <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
                 <p className="text-xs text-purple-900 leading-relaxed">
-                  <strong>Como funciona:</strong> Compartilhe seu código com amigos. Quando eles se cadastrarem usando seu código e se tornarem assinantes ativos por 10 dias, você avança na barra de progresso. Ao completar 10 conversões, você pode resgatar R$ 90 via Pix!
+                  <strong>Como funciona:</strong> Compartilhe seu código com amigos. Quando eles se cadastrarem usando seu código e se tornarem assinantes ativos por 10 dias, você avança na barra de progresso. Ao completar 10 conversões, você pode resgatar R$ 20 via Pix!
                 </p>
               </div>
             </div>

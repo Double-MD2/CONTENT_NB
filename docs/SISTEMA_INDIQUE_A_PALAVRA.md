@@ -14,7 +14,7 @@
 
 ## 🎯 Visão Geral
 
-O sistema "Indique a Palavra" é um programa de indicação com recompensa financeira que permite aos usuários do app Notas-Bíblicas convidar amigos e ganhar R$ 90 via Pix ao completar 10 conversões válidas.
+O sistema "Indique a Palavra" é um programa de indicação com recompensa financeira que permite aos usuários do app Notas-Bíblicas convidar amigos e ganhar R$ 20 via Pix ao completar 10 conversões válidas.
 
 ### Características Principais
 - Código único de convite por usuário (6 caracteres)
@@ -431,7 +431,7 @@ Crie visualizações para:
 2. **Código de Convite** (campo + botão copiar)
 3. **Barra de Progresso** (0/10)
 4. **Regra de Validação** (explicação dos 10 dias)
-5. **Valor da Recompensa** (R$ 90,00)
+5. **Valor da Recompensa** (R$ 20,00)
 6. **Botão de Resgate** (aparece em 10/10)
 7. **Informações Adicionais**
 
