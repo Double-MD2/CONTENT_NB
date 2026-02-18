@@ -7,6 +7,7 @@ import { UserProfile } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { checkOnboardingStatus } from '@/lib/onboarding-guard';
 import { loopGuard, getRedirectOrigin, buildRedirectUrl } from '@/lib/loop-guard';
+import { isValidReferralCodeFormat, normalizeReferralCode } from '@/lib/referral-codes';
 
 const questions = [
   // Etapa 0 - Tela de abertura (será tratada separadamente)
@@ -25,6 +26,7 @@ const questions = [
   { id: 'divineCuriosity', label: 'Você costuma fazer perguntas sobre a vida e Deus?', type: 'select', options: ['Sim', 'Raramente', 'Não'] },
   { id: 'religiousAppsUsage', label: 'Você já usou aplicativos religiosos antes?', type: 'boolean' },
   { id: 'appUsageReason', label: 'Qual seria seu principal motivo para usar um app religioso?', type: 'select', options: ['Aumentar a fé', 'Aprender mais', 'Conectar-se com outros', 'Outro'] },
+  { id: 'referralCode', label: 'Você tem um código de convite?', type: 'text-optional', placeholder: 'Digite o código (opcional)' },
 ];
 
 export default function OnboardingPage() {
@@ -240,10 +242,55 @@ export default function OnboardingPage() {
 
       console.log('[ONBOARDING] ✅ Perfil salvo com sucesso!', data);
 
+      // Processar código de indicação se fornecido
+      const referralCodeInput = profile.referralCode as string | undefined;
+      if (referralCodeInput && referralCodeInput.trim()) {
+        const normalizedCode = normalizeReferralCode(referralCodeInput);
+
+        if (isValidReferralCodeFormat(normalizedCode)) {
+          console.log('[ONBOARDING] Código de indicação fornecido:', normalizedCode);
+
+          // Buscar o referrer pelo código
+          const { data: referrerData, error: referrerError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('referral_code', normalizedCode)
+            .single();
+
+          if (referrerError) {
+            console.error('[ONBOARDING] Código de indicação não encontrado:', normalizedCode);
+          } else if (referrerData) {
+            // Verificar se não é autoindicação
+            if (referrerData.id === userId) {
+              console.warn('[ONBOARDING] ⚠️ Tentativa de autoindicação bloqueada');
+            } else {
+              // Registrar a indicação
+              const { error: referralError } = await supabase
+                .from('referrals')
+                .insert({
+                  referrer_id: referrerData.id,
+                  referred_id: userId,
+                  referral_code: normalizedCode,
+                  created_at: new Date().toISOString(),
+                  is_valid: false, // Será validado quando o usuário assinar e completar 10 dias
+                });
+
+              if (referralError) {
+                console.error('[ONBOARDING] Erro ao registrar indicação:', referralError);
+              } else {
+                console.log('[ONBOARDING] ✅ Indicação registrada com sucesso!');
+              }
+            }
+          }
+        } else {
+          console.warn('[ONBOARDING] Código de indicação inválido:', referralCodeInput);
+        }
+      }
+
       // Salvar no localStorage (fallback)
       localStorage.setItem(`user_profile_${userId}`, JSON.stringify(profile));
       localStorage.setItem('onboardingCompleted', 'true');
-      
+
       console.log('[ONBOARDING] ✅ Quiz completo! Redirecionando para /home');
       
       // Telemetria
@@ -282,6 +329,10 @@ export default function OnboardingPage() {
   const isAnswered = () => {
     if (currentStep === -1 || currentStep >= questions.length) return true;
     const currentQuestion = questions[currentStep];
+
+    // Perguntas opcionais sempre permitem avançar
+    if (currentQuestion.type === 'text-optional') return true;
+
     const value = profile[currentQuestion.id as keyof UserProfile];
     return value !== undefined && value !== '';
   };
@@ -417,6 +468,26 @@ export default function OnboardingPage() {
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none transition-colors"
               placeholder="Digite sua resposta..."
             />
+          )}
+
+          {/* Text Input Optional */}
+          {currentQuestion.type === 'text-optional' && (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={(profile[currentQuestion.id as keyof UserProfile] as string) || ''}
+                onChange={(e) => handleInputChange(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none transition-colors text-center font-bold text-lg tracking-widest"
+                placeholder={currentQuestion.placeholder || 'Digite aqui (opcional)'}
+                maxLength={8}
+              />
+              <button
+                onClick={() => handleInputChange('')}
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-amber-300 transition-all text-gray-600 text-sm"
+              >
+                Não possuo
+              </button>
+            </div>
           )}
 
           {/* Select */}

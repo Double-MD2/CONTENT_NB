@@ -23,6 +23,10 @@ import {
   Share2,
   Copy,
   Check,
+  Gift,
+  Users,
+  Target,
+  Sparkles,
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -31,11 +35,12 @@ import { useSidebar } from '@/contexts/SidebarContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import Frequency30Days from './Frequency30Days';
 import MercadinhoStore from './MercadinhoStore';
+import { generateReferralCode, normalizeReferralCode } from '@/lib/referral-codes';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'account' | 'contribute' | 'frequency' | 'store';
+  initialTab?: 'account' | 'contribute' | 'frequency' | 'store' | 'referral';
 }
 
 interface ActivityDay {
@@ -46,7 +51,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
   const router = useRouter();
   const { setIsSidebarOpen } = useSidebar();
   const { isInTrial, trialDaysRemaining, isActive: hasActiveSubscription } = useSubscription();
-  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store' | 'referral'>(initialTab);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
@@ -61,10 +66,16 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
   const [maxStreak, setMaxStreak] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Estados do sistema de indicação
+  const [referralCode, setReferralCode] = useState<string>('');
+  const [validConversions, setValidConversions] = useState(0);
+  const [canRedeem, setCanRedeem] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       loadUserProfile();
       loadActivities();
+      loadReferralData();
     }
     setIsSidebarOpen(isOpen);
   }, [isOpen, setIsSidebarOpen]);
@@ -365,6 +376,105 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const loadReferralData = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        console.log('[SIDEBAR] Não autenticado, não carregando dados de indicação');
+        return;
+      }
+
+      // Buscar ou criar código de indicação
+      let { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('referral_code')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('[SIDEBAR] Erro ao buscar código de indicação:', profileError);
+        return;
+      }
+
+      let code = profileData?.referral_code;
+
+      // Se não existe código, gerar um novo
+      if (!code) {
+        code = generateReferralCode(user.id);
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ referral_code: code })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error('[SIDEBAR] Erro ao salvar código de indicação:', updateError);
+        }
+      }
+
+      setReferralCode(code);
+
+      // Buscar indicações válidas (assinantes ativos por mais de 10 dias)
+      const { data: referrals, error: referralsError } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referrer_id', user.id)
+        .eq('is_valid', true);
+
+      if (referralsError) {
+        console.error('[SIDEBAR] Erro ao buscar indicações:', referralsError);
+        return;
+      }
+
+      const validCount = referrals?.length || 0;
+      setValidConversions(validCount);
+      setCanRedeem(validCount >= 10);
+
+      console.log('[SIDEBAR] ✅ Dados de indicação carregados:', {
+        code,
+        validConversions: validCount,
+        canRedeem: validCount >= 10,
+      });
+    } catch (err) {
+      console.error('[SIDEBAR] Exceção ao carregar dados de indicação:', err);
+    }
+  };
+
+  const handleRedeemReward = async () => {
+    if (!canRedeem) return;
+
+    const message = encodeURIComponent(
+      `Olá! Atingi 10 conversões válidas no sistema "Indique a Palavra" do app Notas-Bíblicas e gostaria de resgatar minha recompensa de R$90.\n\nMeu código de indicação: ${referralCode}`
+    );
+
+    const whatsappUrl = `https://wa.me/5564992016685?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+
+    // Registrar resgate no banco
+    if (userId) {
+      try {
+        await supabase.from('referral_redemptions').insert({
+          user_id: userId,
+          referral_code: referralCode,
+          conversions_count: validConversions,
+          redeemed_at: new Date().toISOString(),
+        });
+        console.log('[SIDEBAR] Resgate registrado');
+      } catch (err) {
+        console.error('[SIDEBAR] Erro ao registrar resgate:', err);
+      }
+    }
+  };
+
+  const handleCopyReferralCode = () => {
+    if (!referralCode) return;
+
+    navigator.clipboard.writeText(referralCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const getLast30Days = (): { date: Date; hasActivity: boolean }[] => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -453,10 +563,10 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('account')}
-            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
               activeTab === 'account'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -465,18 +575,28 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
             Conta
           </button>
           <button
+            onClick={() => setActiveTab('referral')}
+            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+              activeTab === 'referral'
+                ? 'text-amber-600 border-b-2 border-amber-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Indique a Palavra
+          </button>
+          <button
             onClick={() => setActiveTab('contribute')}
-            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
               activeTab === 'contribute'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Indique
+            Compartilhe
           </button>
           <button
             onClick={() => setActiveTab('frequency')}
-            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
               activeTab === 'frequency'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -486,7 +606,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
           </button>
           <button
             onClick={() => setActiveTab('store')}
-            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
               activeTab === 'store'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -662,6 +782,126 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Indique a Palavra Tab - Sistema de Recompensas */}
+          {activeTab === 'referral' && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Gift className="w-8 h-8 text-amber-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Indique a Palavra</h3>
+                <p className="text-gray-600 text-sm px-4">
+                  Convide amigos para o Notas-Bíblicas e ganhe uma recompensa quando eles se tornarem assinantes.
+                </p>
+              </div>
+
+              {/* Código de Convite */}
+              <div className="bg-amber-50 p-5 rounded-xl border-2 border-amber-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-5 h-5 text-amber-600" />
+                  <p className="text-xs font-bold text-amber-800 uppercase tracking-widest">
+                    Seu Código de Convite
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white p-3 border-2 border-amber-300 rounded-lg shadow-sm">
+                  <input
+                    readOnly
+                    value={referralCode || 'Carregando...'}
+                    className="flex-1 text-2xl font-bold text-amber-900 text-center outline-none bg-transparent tracking-widest"
+                  />
+                  <button
+                    onClick={handleCopyReferralCode}
+                    disabled={!referralCode}
+                    className="p-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-md transition-all active:scale-95 disabled:opacity-50"
+                    title="Copiar Código"
+                  >
+                    {copied ? (
+                      <Check className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <Copy className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+
+                {copied && (
+                  <p className="text-xs text-green-600 mt-2 font-bold flex items-center justify-center gap-1">
+                    <Check className="w-3 h-3" /> Código copiado!
+                  </p>
+                )}
+              </div>
+
+              {/* Barra de Progresso */}
+              <div className="bg-white p-5 rounded-xl border-2 border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <p className="text-sm font-bold text-gray-800">Conversões Válidas</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">{validConversions}/10</p>
+                </div>
+
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden mb-2">
+                  <div
+                    className="bg-blue-600 h-4 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min((validConversions / 10) * 100, 100)}%` }}
+                  />
+                </div>
+
+                <p className="text-xs text-gray-600 text-center">
+                  Faltam {Math.max(10 - validConversions, 0)} conversões para resgatar sua recompensa
+                </p>
+              </div>
+
+              {/* Regra */}
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-blue-900 mb-1">Regra de Validação</p>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Somente assinantes ativos por pelo menos 10 dias contam para o progresso. Isso garante um sistema justo e sustentável.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recompensa */}
+              <div className="bg-green-50 rounded-xl p-5 border-2 border-green-200 text-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <DollarSign className="w-7 h-7 text-green-700" />
+                </div>
+                <p className="text-sm font-semibold text-gray-800 mb-1">Recompensa</p>
+                <p className="text-3xl font-bold text-green-700 mb-2">R$ 90,00</p>
+                <p className="text-xs text-gray-600">Pago via Pix ao atingir 10 conversões válidas</p>
+              </div>
+
+              {/* Botão de Resgate */}
+              {canRedeem ? (
+                <button
+                  onClick={handleRedeemReward}
+                  className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Gift className="w-5 h-5" />
+                  Resgatar Recompensa via WhatsApp
+                </button>
+              ) : (
+                <div className="bg-gray-100 rounded-xl p-4 text-center border-2 border-dashed border-gray-300">
+                  <p className="text-sm text-gray-600">
+                    Continue compartilhando seu código para desbloquear o resgate!
+                  </p>
+                </div>
+              )}
+
+              {/* Informação Adicional */}
+              <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                <p className="text-xs text-purple-900 leading-relaxed">
+                  <strong>Como funciona:</strong> Compartilhe seu código com amigos. Quando eles se cadastrarem usando seu código e se tornarem assinantes ativos por 10 dias, você avança na barra de progresso. Ao completar 10 conversões, você pode resgatar R$ 90 via Pix!
+                </p>
+              </div>
             </div>
           )}
 

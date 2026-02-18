@@ -23,6 +23,7 @@ export interface UserProfile {
   additionalInfo: string;
   profilePhoto?: string;
   favoriteVerse?: string;
+  referralCode?: string; // Código de convite usado no cadastro
 }
 
 export interface DailyContent {
