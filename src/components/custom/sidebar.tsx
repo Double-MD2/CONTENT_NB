@@ -798,16 +798,18 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                 </div>
 
                 <div className="bg-white border-2 border-amber-300 rounded-lg shadow-sm overflow-hidden">
-                  <div className="flex items-center">
-                    <input
-                      readOnly
-                      value={referralCode || 'Carregando...'}
-                      className="flex-1 text-2xl font-bold text-amber-900 text-center outline-none bg-transparent tracking-widest py-3 px-3"
-                    />
+                  <div className="flex items-stretch">
+                    <div className="flex-1 flex items-center justify-center py-3 px-4">
+                      <input
+                        readOnly
+                        value={referralCode || 'Carregando...'}
+                        className="w-full text-2xl font-bold text-amber-900 text-center outline-none bg-transparent tracking-wide"
+                      />
+                    </div>
                     <button
                       onClick={handleCopyReferralCode}
                       disabled={!referralCode}
-                      className="p-3 bg-amber-100 hover:bg-amber-200 text-amber-700 transition-all active:scale-95 disabled:opacity-50 border-l-2 border-amber-300"
+                      className="flex items-center justify-center px-3 bg-amber-100 hover:bg-amber-200 text-amber-700 transition-all active:scale-95 disabled:opacity-50 border-l-2 border-amber-300"
                       title="Copiar Código"
                     >
                       {copied ? (
