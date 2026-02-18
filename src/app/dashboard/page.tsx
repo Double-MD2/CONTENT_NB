@@ -59,22 +59,6 @@ const mockContents: DailyContent[] = [
     completed: false,
   },
   {
-    id: '3',
-    type: 'devotional',
-    title: 'Conexão',
-    content: 'Responda perguntas sobre sua jornada espiritual e personalize sua experiência no app.',
-    questions: [
-      'Quão próximo você se sente de Deus?',
-      'Quão importante é a fé na sua vida?',
-      'Com que frequência você ora?',
-      'Sente que está evoluindo na relação com Deus?',
-      'Quão envolvido você está em atividades da sua comunidade religiosa?',
-    ],
-    duration: '7 min',
-    image: 'https://images.unsplash.com/photo-1519491050282-cf00c82424b4?w=800&h=400&fit=crop&q=80',
-    completed: false,
-  },
-  {
     id: '5',
     type: 'gratitude',
     title: 'Agradecimento a Deus',
@@ -395,8 +379,6 @@ export default function HomePage() {
       window.location.href = '/versiculo-do-dia';
     } else if (content.type === 'prayer') {
       window.location.href = '/oracao-do-dia';
-    } else if (content.type === 'devotional') {
-      window.location.href = '/conexao';
     }
   };
 
