@@ -95,23 +95,25 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
         return;
       }
 
-      // 🔹 Últimos 30 dias (para visualização)
-      const { data, error } = await supabase
+      // 🔹 Buscar TODO o histórico de atividades (sem limite) para calcular a sequência real
+      const { data: allActivities, error } = await supabase
         .from('user_week_activity')
         .select('activity_date')
         .eq('user_id', user.id)
-        .order('activity_date', { ascending: false })
-        .limit(30);
+        .order('activity_date', { ascending: false });
 
       if (error) {
         console.error('[SIDEBAR] Erro ao carregar atividades:', error);
         return;
       }
 
-      setActivities(data || []);
-
-      const streak = calculateStreak(data || []);
+      // 🔹 Calcular sequência atual com o histórico completo
+      const streak = calculateStreak(allActivities || []);
       setConsecutiveDays(streak);
+
+      // 🔹 Últimos 30 dias apenas para visualização do calendário
+      const last30Days = (allActivities || []).slice(0, 30);
+      setActivities(last30Days);
 
       // 🔹 Contagem total de acessos (sem limite)
       const { count } = await supabase
@@ -121,18 +123,12 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
 
       setTotalAccessedDays(count || 0);
 
-      // 🔹 Buscar histórico completo para calcular maior sequência
-      const { data: allActivities } = await supabase
-        .from('user_week_activity')
-        .select('activity_date')
-        .eq('user_id', user.id)
-        .order('activity_date', { ascending: true });
-
+      // 🔹 Calcular maior sequência histórica
       const max = calculateMaxStreak(allActivities || []);
       setMaxStreak(max);
 
       console.log('[SIDEBAR] ✅ Atividades carregadas:', {
-        totalUltimos30: data?.length || 0,
+        totalUltimos30: last30Days.length,
         totalGeral: count,
         streakAtual: streak,
         maiorSequencia: max,
