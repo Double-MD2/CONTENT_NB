@@ -118,7 +118,7 @@ export default function HomePage() {
   const { isActive: hasAccess, isInTrial, loading: subscriptionLoading } = useSubscription();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarInitialTab, setSidebarInitialTab] = useState<'account' | 'contribute' | 'frequency' | 'store'>('account');
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'account' | 'frequency' | 'store' | 'referral'>('account');
   const [contents, setContents] = useState<DailyContent[]>(mockContents);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -408,7 +408,7 @@ export default function HomePage() {
     }
   };
 
-  const openSidebarWithTab = (tab: 'account' | 'contribute' | 'frequency' | 'store') => {
+  const openSidebarWithTab = (tab: 'account' | 'frequency' | 'store' | 'referral') => {
     setSidebarInitialTab(tab);
     setSidebarOpen(true);
   };
@@ -518,14 +518,14 @@ export default function HomePage() {
             <span className="text-xs font-semibold text-gray-700 text-center">Bíblia</span>
           </button>
 
-          <button 
-            onClick={() => openSidebarWithTab('contribute')}
+          <button
+            onClick={() => openSidebarWithTab('referral')}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
             <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xs font-semibold text-gray-700 text-center">Contribuir</span>
+            <span className="text-xs font-semibold text-gray-700 text-center">Indique</span>
           </button>
 
           <button 

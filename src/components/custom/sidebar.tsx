@@ -40,7 +40,7 @@ import { generateReferralCode, normalizeReferralCode } from '@/lib/referral-code
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'account' | 'contribute' | 'frequency' | 'store' | 'referral';
+  initialTab?: 'account' | 'frequency' | 'store' | 'referral';
 }
 
 interface ActivityDay {
@@ -51,7 +51,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
   const router = useRouter();
   const { setIsSidebarOpen } = useSidebar();
   const { isInTrial, trialDaysRemaining, isActive: hasActiveSubscription } = useSubscription();
-  const [activeTab, setActiveTab] = useState<'account' | 'contribute' | 'frequency' | 'store' | 'referral'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'account' | 'frequency' | 'store' | 'referral'>(initialTab);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
@@ -563,10 +563,10 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 overflow-x-auto">
+        <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab('account')}
-            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               activeTab === 'account'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -576,27 +576,17 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
           </button>
           <button
             onClick={() => setActiveTab('referral')}
-            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               activeTab === 'referral'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Indique a Palavra
-          </button>
-          <button
-            onClick={() => setActiveTab('contribute')}
-            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-              activeTab === 'contribute'
-                ? 'text-amber-600 border-b-2 border-amber-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Compartilhe
+            Indique
           </button>
           <button
             onClick={() => setActiveTab('frequency')}
-            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               activeTab === 'frequency'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -606,7 +596,7 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
           </button>
           <button
             onClick={() => setActiveTab('store')}
-            className={`flex-1 py-3 px-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               activeTab === 'store'
                 ? 'text-amber-600 border-b-2 border-amber-600'
                 : 'text-gray-500 hover:text-gray-700'
@@ -900,59 +890,6 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
               <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
                 <p className="text-xs text-purple-900 leading-relaxed">
                   <strong>Como funciona:</strong> Compartilhe seu código com amigos. Quando eles se cadastrarem usando seu código e se tornarem assinantes ativos por 10 dias, você avança na barra de progresso. Ao completar 10 conversões, você pode resgatar R$ 20 via Pix!
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Indique Tab — CORRIGIDA */}
-          {activeTab === 'contribute' && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Share2 className="w-8 h-8 text-amber-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Indique a Palavra</h3>
-                <p className="text-gray-600 text-sm">
-                  Compartilhe sua jornada com amigos e familiares e ajude a semear o Evangelho.
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-5 rounded-xl border-2 border-dashed border-gray-200">
-                <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-widest">
-                  Seu Link de Indicação
-                </p>
-
-                <div className="flex items-center gap-2 bg-white p-2 border-2 border-gray-100 rounded-lg shadow-sm">
-                  <input
-                    readOnly
-                    value={userId ? `https://minhabiblia.com.br/register?ref=${userId}` : 'Carregando...'}
-                    className="flex-1 text-sm text-gray-500 outline-none bg-transparent px-2 overflow-hidden text-ellipsis whitespace-nowrap"
-                  />
-                  <button
-                    onClick={handleCopyLink}
-                    disabled={!userId}
-                    className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-md transition-all active:scale-95 disabled:opacity-50"
-                    title="Copiar Link"
-                  >
-                    {copied ? (
-                      <Check className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Copy className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-
-                {copied && (
-                  <p className="text-[10px] text-green-600 mt-2 font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Link copiado com sucesso!
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  <strong>Dica:</strong> Ao convidar novos irmãos, você fortalece nossa comunidade e nos ajuda a manter o projeto ativo.
                 </p>
               </div>
             </div>
