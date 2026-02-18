@@ -797,24 +797,26 @@ export default function Sidebar({ isOpen, onClose, initialTab = 'account' }: Sid
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 bg-white p-3 border-2 border-amber-300 rounded-lg shadow-sm">
-                  <input
-                    readOnly
-                    value={referralCode || 'Carregando...'}
-                    className="flex-1 text-2xl font-bold text-amber-900 text-center outline-none bg-transparent tracking-widest"
-                  />
-                  <button
-                    onClick={handleCopyReferralCode}
-                    disabled={!referralCode}
-                    className="p-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-md transition-all active:scale-95 disabled:opacity-50"
-                    title="Copiar Código"
-                  >
-                    {copied ? (
-                      <Check className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Copy className="w-5 h-5" />
-                    )}
-                  </button>
+                <div className="bg-white border-2 border-amber-300 rounded-lg shadow-sm overflow-hidden">
+                  <div className="flex items-center">
+                    <input
+                      readOnly
+                      value={referralCode || 'Carregando...'}
+                      className="flex-1 text-2xl font-bold text-amber-900 text-center outline-none bg-transparent tracking-widest py-3 px-3"
+                    />
+                    <button
+                      onClick={handleCopyReferralCode}
+                      disabled={!referralCode}
+                      className="p-3 bg-amber-100 hover:bg-amber-200 text-amber-700 transition-all active:scale-95 disabled:opacity-50 border-l-2 border-amber-300"
+                      title="Copiar Código"
+                    >
+                      {copied ? (
+                        <Check className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Copy className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {copied && (
